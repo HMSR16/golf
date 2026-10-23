@@ -145,6 +145,9 @@ input[type=email]{font:inherit;font-size:17px;color:var(--fg);background:var(--b
 .rh{font-family:var(--font-num);font-size:20px;font-weight:700;text-align:center}
 .ropen{padding:8px 0}
 .nw{white-space:nowrap}
+.editbox{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:12px}
+.elist{display:flex;flex-direction:column;gap:6px}
+.erow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
 .btn.ordbtn{background:var(--danger);border-color:var(--danger);color:var(--card)}
 .ordnow{display:flex;flex-wrap:wrap;gap:6px 14px}
 .ordnow span{display:flex;align-items:center;gap:6px;font-weight:700}
@@ -774,6 +777,14 @@ function demoBackend(){
     async removeFromGroup(code,pid){const a=all(), ev=a[code]; if(!ev) return; const k=grp(ev,pid); if(!k) return;
       const G=ev.groups[k]; G.members=G.members.filter(x=>x!==pid); if(!G.members.length) delete ev.groups[k]; save(a); notify(code);},
     async cleanup(){},
+    // 主催者による修正（パー・参加者）
+    async editPars(code,pars){const a=all(), ev=a[code]; if(!ev) return; ev.pars=pars.slice(); save(a); notify(code);},
+    async renamePlayer(code,pid,name){const a=all(), ev=a[code]; if(!ev) return; const p=ev.players.find(x=>x.id===pid); if(p) p.name=name; save(a); notify(code);},
+    async addPlayer(code,name){const a=all(), ev=a[code]; if(!ev) return; if(ev.players.length>=MAXP) throw new Error('max');
+      const id='p'+(Math.max(0,...ev.players.map(x=>+x.id.slice(1)))+1); ev.players.push({id,name}); save(a); notify(code);},
+    async removePlayer(code,pid){const a=all(), ev=a[code]; if(!ev) return; ev.players=ev.players.filter(x=>x.id!==pid);
+      const k=grp(ev,pid); if(k){const G=ev.groups[k]; G.members=G.members.filter(x=>x!==pid); if(!G.members.length) delete ev.groups[k];}
+      delete ev.scores[pid]; save(a); notify(code);},
     auth:{instant:true,
       onChange(cb){regCb=cb; setTimeout(()=>cb(regGet()),0);},
       isLink(){return false;},
@@ -810,7 +821,7 @@ const fmtD=d=>{const p=String(d||'').split('-'); return p.length===3?`${+p[1]}�
 const shareUrl=code=>`https://hmsr16.github.io/golf/#${code}`;
 const evTitle=ev=>ev.name||ev.course||'コンペ';
 
-let curEv=null, J={step:'code',code:'',msg:'',early:false,me:null,picks:[]}, galMsg='', galEarly=false, orgMsg='', grmAsk=null, ormAsk=null, rankOpen=null, regMsg='', regDel=false, busy=false;
+let curEv=null, J={step:'code',code:'',msg:'',early:false,me:null,picks:[]}, galMsg='', galEarly=false, orgMsg='', grmAsk=null, ormAsk=null, orgEdit=null, prmAsk=null, rankOpen=null, regMsg='', regDel=false, busy=false;
 let REG=null, HIST=[], unsubH=null, regStep=null, regMail='', regLink='';
 
 // 登録の状態と履歴の読み込み
@@ -881,7 +892,19 @@ function evCard(ev){const inG=new Set(Object.values(ev.groups).flatMap(G=>G.memb
     ${gs.length?gs.map(g=>{const G=ev.groups[g]; return `<div class="grow"><b>${g}組</b><span class="note">（${esc(pName(ev,G.by))}が選択）</span><div class="chips">${G.members.map(x=>`<button class="chip" data-orm="${ev.code}|${x}">${esc(pName(ev,x))} ✕</button>`).join('')}</div></div>`;}).join(''):'<div class="note">まだ組はできていません。</div>'}
     ${ormAsk&&ormAsk.startsWith(ev.code+'|')?(()=>{const pid=ormAsk.split('|')[1]; return `<div class="confirm"><div><b>${esc(pName(ev,pid))}</b>さんを組から外しますか？ 入力済みのスコアは消えません。</div><div class="row"><button class="btn danger" id="ormYes">外す</button><button class="btn ghost" id="ormNo">やめる</button></div></div>`;})():''}
     ${rest.length?`<div class="note">まだ組に入っていない人：${rest.map(p=>esc(p.name)).join('・')}</div>`:''}
+    ${orgEdit===ev.code?evEdit(ev):`<button class="btn ghost" data-oedit="${ev.code}">内容を直す（パー・参加者）</button>`}
   </section>`;}
+// 発行後の修正（発行した主催者だけ）。開催日は変えられない
+function evEdit(ev){const hasSc=pid=>(ev.scores[pid]||[]).some(v=>v!=null);
+  return `<div class="editbox"><div class="label">各ホールのパー（タップで 4→5→3 と変わります）</div>
+    ${[0,9].map(a=>`<div class="pgrid">${[...Array(9)].map((_,j)=>`<button class="pc" data-ep="${a+j}">${a+j+1}<b>${ev.pars[a+j]}</b></button>`).join('')}<div class="pc tot">${a?'IN':'OUT'}<b>${ev.pars.slice(a,a+9).reduce((x,y)=>x+y,0)}</b></div></div>`).join('')}
+    <div class="note">パーを変えると、入力済みのスコアの表示と順位も新しいパーで計算し直されます。</div>
+    <div class="label">参加者（${ev.players.length}人・最大40人）</div>
+    <div class="elist">${ev.players.map(p=>prmAsk===p.id?`<div class="confirm"><div><b>${esc(p.name)}</b>さんを参加者から削除しますか？${groupOf(ev,p.id)||hasSc(p.id)?' 組分けと入力済みのスコアも消えます。':''}元に戻せません。</div><div class="row"><button class="btn danger" id="prmYes">削除する</button><button class="btn ghost" id="prmNo">やめる</button></div></div>`
+      :`<div class="erow"><input type="text" data-ern="${p.id}" value="${esc(p.name)}" aria-label="参加者の名前"><button class="chip" data-erm="${p.id}">削除</button></div>`).join('')}</div>
+    ${ev.players.length<MAXP?`<div class="erow"><input type="text" id="eAdd" placeholder="追加する人の名前"><button class="chip" id="eAddBtn">追加</button></div>`:''}
+    <div class="note">名前は直したあと、ほかの所を押すと保存されます。</div>
+    <button class="btn" id="eDone">直し終わった</button></div>`;}
 function vOrg(){const o=orgDraft(), names=orgNames(), mine=myEvents().map(e=>Shared.get(e.code)).filter(Boolean);
   return `${mine.map(evCard).join('')}
   <section class="card"><div class="label">新しいコンペを登録</div>
@@ -978,6 +1001,22 @@ function bindShared(){const $=id=>document.getElementById(id);
       busy=false; render();};}
   document.querySelectorAll('[data-orm]').forEach(b=>b.onclick=()=>{ormAsk=b.dataset.orm; render();});
   if($('ormNo')) $('ormNo').onclick=()=>{ormAsk=null;render();};
+  document.querySelectorAll('[data-oedit]').forEach(b=>b.onclick=()=>{orgEdit=b.dataset.oedit; prmAsk=null; render();});
+  if($('eDone')) $('eDone').onclick=()=>{orgEdit=null; prmAsk=null; render();};
+  const eev=orgEdit&&Shared.get(orgEdit), edErr=()=>{toast='直せませんでした。このIDを発行したスマホからのみ直せます。電波も確かめてください。'; render();};
+  if(eev){
+    document.querySelectorAll('[data-ep]').forEach(b=>b.onclick=()=>{const i=+b.dataset.ep, ps=eev.pars.slice(); ps[i]=ps[i]===4?5:ps[i]===5?3:4; B.editPars(eev.code,ps).catch(edErr);});
+    document.querySelectorAll('[data-ern]').forEach(inp=>inp.onchange=()=>{const n=inp.value.trim(), pid=inp.dataset.ern;
+      if(!n){toast='名前を入れてください。'; render(); return;}
+      if(eev.players.some(x=>x.id!==pid&&x.name===n)){toast='同じ名前の人がいます。区別できるように名前を変えてください。'; render(); return;}
+      B.renamePlayer(eev.code,pid,n).catch(edErr);});
+    document.querySelectorAll('[data-erm]').forEach(b=>b.onclick=()=>{prmAsk=b.dataset.erm; render();});
+    if($('prmNo')) $('prmNo').onclick=()=>{prmAsk=null; render();};
+    if($('prmYes')) $('prmYes').onclick=()=>{const pid=prmAsk; prmAsk=null; B.removePlayer(eev.code,pid).then(()=>{toast='削除しました。';render();}).catch(edErr); render();};
+    if($('eAddBtn')) $('eAddBtn').onclick=()=>{const n=($('eAdd').value||'').trim(); if(!n) return;
+      if(eev.players.some(x=>x.name===n)){toast='同じ名前の人がいます。区別できるように名前を変えてください。'; render(); return;}
+      B.addPlayer(eev.code,n).then(()=>{toast=`${n}さんを追加しました。`; render();}).catch(edErr);};
+  }
   if($('ormYes')) $('ormYes').onclick=()=>{const [code,pid]=ormAsk.split('|'); ormAsk=null; B.removeFromGroup(code,pid).catch(netErr); render();};
   document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{const t=b.dataset.copy;
     try{navigator.clipboard.writeText(t).then(()=>{toast='URLをコピーしました。LINEなどに貼り付けられます。';render();},()=>{toast='コピーできませんでした。URLを長押しして選んでください。';render();});}catch(e){toast='コピーできませんでした。URLを長押しして選んでください。';render();}});
@@ -1041,7 +1080,7 @@ function bindShared(){const $=id=>document.getElementById(id);
 }
 // このスマホで発行したイベントのうち、期限が過ぎたものを共有データから消す
 setTimeout(()=>{const now=Date.now(), old=(L.myEvents||[]).filter(e=>typeof e==='object'&&e.end&&now>e.end);
-  old.forEach(e=>B.cleanup(e.code,e.n||MAXP).catch(()=>{}));
+  old.forEach(e=>B.cleanup(e.code).catch(()=>{}));
   if(old.length){L.myEvents=myEvents(); saveL();}},3000);
 
 function vSetupAll(){

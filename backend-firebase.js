@@ -33,11 +33,14 @@
       return ()=>{u1();u2();};},
     // IDを発行（4桁の数字。使われていない番号を選ぶ）
     async createEvent(d){const exp=TS.fromMillis(endOf(d.date));
+      // 発行した人だけがあとで直せるように、このスマホの持ち主の番号（ログインしていなければ名前のない仮の番号）を記録する
+      if(!auth.currentUser) await auth.signInAnonymously();
+      const owner=auth.currentUser.uid;
       for(let n=0;n<15;n++){const code=String(1000+Math.floor(Math.random()*9000)), ref=evRef(code);
         try{
           const ok=await db.runTransaction(async t=>{const s=await t.get(ref); if(s.exists) return false;
             t.set(ref,{code,date:d.date,name:d.name,course:d.course,pars:d.pars.slice(),
-              players:d.players.map((nm,j)=>({id:'p'+(j+1),name:nm})),groups:{},expireAt:exp,createdAt:FV.serverTimestamp()}); return true;});
+              players:d.players.map((nm,j)=>({id:'p'+(j+1),name:nm})),groups:{},owner,expireAt:exp,createdAt:FV.serverTimestamp()}); return true;});
           if(ok) return code;
         }catch(e){ if(isDenied(e)){ try{await ref.delete();}catch(e2){} continue; } throw e; } // 期限切れの古いIDなら消して別の番号へ
       }
@@ -54,16 +57,33 @@
         const m=g[k].members.filter(x=>x!==pid);
         t.update(ref,m.length?{['groups.'+k+'.members']:m}:{['groups.'+k]:FV.delete()});});},
     // 期限が過ぎたイベントのデータを消す（発行した人のスマホで行う）
-    async cleanup(code,n){const ref=evRef(code);
-      for(let j=1;j<=n;j++){try{await ref.collection('scores').doc('p'+j).delete();}catch(e){}}
+    async cleanup(code){const ref=evRef(code);
+      for(let j=1;j<=60;j++){try{await ref.collection('scores').doc('p'+j).delete();}catch(e){}}
       try{await ref.delete();}catch(e){}},
+    // 主催者による修正（発行した人だけ。ルールでも確かめる）
+    editPars(code,pars){return evRef(code).update({pars:pars.slice()});},
+    renamePlayer(code,pid,name){const ref=evRef(code);
+      return db.runTransaction(async t=>{const s=await t.get(ref); const ps=s.data().players.map(x=>x.id===pid?{id:x.id,name}:x); t.update(ref,{players:ps});});},
+    addPlayer(code,name){const ref=evRef(code);
+      return db.runTransaction(async t=>{const s=await t.get(ref); const ps=s.data().players; if(ps.length>=40) throw new Error('max');
+        const id='p'+(Math.max(0,...ps.map(x=>+x.id.slice(1)))+1); t.update(ref,{players:ps.concat([{id,name}])});});},
+    async removePlayer(code,pid){const ref=evRef(code);
+      await db.runTransaction(async t=>{const s=await t.get(ref); const d=s.data(), g=d.groups||{}, k=grp(g,pid);
+        const up={players:d.players.filter(x=>x.id!==pid)};
+        if(k){const m=g[k].members.filter(x=>x!==pid); if(m.length) up['groups.'+k+'.members']=m; else up['groups.'+k]=FV.delete();}
+        t.update(ref,up);});
+      try{await ref.collection('scores').doc(pid).delete();}catch(e){}},
     auth:{instant:false,
-      onChange(cb){auth.onAuthStateChanged(u=>cb(u?{uid:u.uid,label:u.email||u.displayName||'登録済み'}:null));},
+      onChange(cb){auth.onAuthStateChanged(u=>cb(u&&!u.isAnonymous?{uid:u.uid,label:u.email||u.displayName||'登録済み'}:null));},
       isLink(link){try{return auth.isSignInWithEmailLink(link);}catch(e){return false;}},
       sendLink(email){try{localStorage.setItem('vegas-mail',email);}catch(e){}
         return auth.sendSignInLinkToEmail(email,{url:location.origin+location.pathname,handleCodeInApp:true});},
-      completeLink(email,link){return auth.signInWithEmailLink(email,link);},
-      google(){return auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());},
+      async completeLink(email,link){const u=auth.currentUser;
+        if(u&&u.isAnonymous){try{return await u.linkWithCredential(firebase.auth.EmailAuthProvider.credentialWithLink(email,link));}catch(e){ if(e&&e.code==='auth/invalid-action-code') throw e; }}
+        return auth.signInWithEmailLink(email,link);},
+      async google(){const pr=new firebase.auth.GoogleAuthProvider(), u=auth.currentUser;
+        if(u&&u.isAnonymous){try{return await u.linkWithPopup(pr);}catch(e){ if(e&&e.credential) return auth.signInWithCredential(e.credential); if(e&&/popup/.test(e.code||'')) throw e; }}
+        return auth.signInWithPopup(pr);},
       async deleteAccount(uid){const u=auth.currentUser; if(!u) return {ok:false};
         const q=await db.collection('users').doc(u.uid).collection('rounds').get();
         for(const d of q.docs){await d.ref.delete();}

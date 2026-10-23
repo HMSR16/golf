@@ -1,32 +1,29 @@
 rules_version = '2';
-// ラスベガス計算アプリ用のルール（Firebaseの Firestore →「ルール」に貼り付けて「公開」する）
 service cloud.firestore {
   match /databases/{database}/documents {
     function evData(code) { return get(/databases/$(database)/documents/events/$(code)).data; }
     function evExists(code) { return exists(/databases/$(database)/documents/events/$(code)); }
-
-    // イベント（ID）：期限内だけ読める。誰でも発行できる。変えられるのは組分けだけ
+    function okEvent(d) { return d.players.size() >= 2 && d.players.size() <= 40 && d.pars.size() == 18; }
     match /events/{code} {
       allow get: if resource == null || request.time < resource.data.expireAt;
       allow create: if code.matches('^[0-9]{4}$')
         && request.resource.data.code == code
-        && request.resource.data.players.size() >= 2
-        && request.resource.data.players.size() <= 40
-        && request.resource.data.pars.size() == 18
+        && request.auth != null && request.resource.data.owner == request.auth.uid
+        && okEvent(request.resource.data)
         && request.resource.data.expireAt > request.time
         && request.resource.data.expireAt < request.time + duration.value(400, 'd');
-      allow update: if request.time < resource.data.expireAt
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['groups']);
+      allow update: if request.time < resource.data.expireAt && (
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['groups'])
+        || (request.auth != null && request.auth.uid == resource.data.owner
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['groups', 'pars', 'players'])
+            && okEvent(request.resource.data)));
       allow delete: if request.time > resource.data.expireAt;
-
-      // スコア：期限内だけ読み書きできる。期限が過ぎたら消せる
       match /scores/{pid} {
         allow read, create, update: if evExists(code) && request.time < evData(code).expireAt;
-        allow delete: if !evExists(code) || request.time > evData(code).expireAt;
+        allow delete: if !evExists(code) || request.time > evData(code).expireAt
+          || (request.auth != null && request.auth.uid == evData(code).owner);
       }
     }
-
-    // 履歴：登録した本人だけが読み書きできる
     match /users/{uid}/rounds/{rid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
