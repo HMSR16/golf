@@ -47,6 +47,19 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .wrap{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
 header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:12px 8px;display:flex;flex-direction:column;gap:10px}
 h1{font-size:19px;margin:0;font-weight:700;letter-spacing:.02em}
+.hrow{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.helpbtn{font:inherit;font-size:14px;font-weight:700;color:var(--accent);background:var(--card);border:1.5px solid var(--accent);border-radius:999px;padding:6px 12px;cursor:pointer;white-space:nowrap;min-height:36px}
+.helpv{font-size:16px;line-height:1.7}
+.htitle{font-size:20px}
+.hsec{border-top:1px solid var(--line);padding:4px 0}
+.hsec summary{font-weight:700;font-size:17px;padding:10px 0;cursor:pointer;color:var(--accent)}
+.hbody p{margin:6px 0}
+.hbody ul{margin:6px 0;padding-left:1.2em}
+.hbody dl{margin:6px 0;display:grid;grid-template-columns:auto 1fr;gap:4px 12px}
+.hbody dt{font-weight:700}
+.hbody dd{margin:0}
+.hbody .ex{background:var(--accent-soft);border-radius:8px;padding:8px 10px}
+@media (max-width:420px){.hbody dl{grid-template-columns:1fr}.hbody dd{margin:0 0 6px}}
 h1 small{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
 .tabs{display:grid;grid-template-columns:repeat(4,1fr);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:3px}
 .tabs button{border:0;background:none;color:var(--muted);font:inherit;font-weight:700;padding:8px 0;border-radius:8px;cursor:pointer}
@@ -281,7 +294,7 @@ input[type=date]::-webkit-datetime-edit{padding:0}
 
 <div class="wrap">
   <header>
-    <h1>ラスベガス<small>ローカルルール版</small></h1>
+    <div class="hrow"><h1>ラスベガス<small>ローカルルール版</small></h1><button class="helpbtn" id="helpBtn">？使い方</button></div>
     <div class="tabs" role="tablist">
       <button id="tab-setup" role="tab" data-v="setup">設定</button>
       <button id="tab-hole" role="tab" data-v="hole">スコア</button>
@@ -541,7 +554,7 @@ function render(){
   rendering=true; try{renderInner();}finally{rendering=false;}
 }
 function renderInner(){
-  syncLinked(); if(L.role==='gallery') L.view='setup';
+  syncLinked(); if(L.role==='gallery'&&L.view!=='help') L.view='setup';
   document.querySelector('.tabs').hidden=L.role==='gallery';
   R=cur();
   document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.v===L.view));
@@ -549,7 +562,7 @@ function renderInner(){
   const top=banner();
   let body;
   if(shared&&!shared.data) body=`<section class="card"><div class="note">共有ラウンドを読み込み中…</div></section>`;
-  else body=L.view==='setup'?vSetupAll():L.view==='hole'?vHole():L.view==='sum'?vSum():vHist();
+  else body=L.view==='help'?vHelp():L.view==='setup'?vSetupAll():L.view==='hole'?vHole():L.view==='sum'?vSum():vHist();
   v.innerHTML=`<div class="wrap${L.view==='setup'?' setupv':''}" style="padding:0">${top}${body}</div>`;
   bind();
 }
@@ -1144,6 +1157,62 @@ function vSetupAll(){
   return roleCard()+(L.link?(curEv?vLinkedCard():loadingCard('共有データを読み込み中…')):`<section class="card"><button class="btn ghost" id="toJoin">IDで参加する</button></section>`)+vSetup()+(L.link&&curEv?vLeaveCard():'');}
 function vHist(){if(!REG) return regCard(); return vHistInner()+(histOpen?'':regCard());}
 
+
+/* ---------- 使い方 ---------- */
+let helpFrom='setup';
+function vHelp(){
+  const sec=(t,body,open)=>`<details class="hsec"${open?' open':''}><summary>${t}</summary><div class="hbody">${body}</div></details>`;
+  return `<section class="card helpv">
+  <div class="row" style="justify-content:space-between"><b class="htitle">使い方</b><button class="btn ghost" id="helpBack">← 戻る</button></div>
+  ${sec('1. このアプリでできること',`
+    <p>ゴルフのスコアを入れると、ラスベガスやマッチプレーの点数、コンペの順位を自動で出します。設定画面の一番上で、役割を選びます。</p>
+    <dl>
+      <dt>主催者</dt><dd>コンペを登録してイベントIDを発行。パー・参加者・組み合わせを決める（メールアドレスの登録が必要）。</dd>
+      <dt>プレーヤー</dt><dd>イベントIDを入れて自分の名前を選び、スコアを入れる。IDを使わず「単体で始める」こともできる。</dd>
+      <dt>ギャラリー</dt><dd>イベントIDを入れると、順位表とスコアカードを見られる。</dd>
+    </dl>`,true)}
+  ${sec('2. ホーム画面に追加する',`
+    <p>追加すると、アイコンから開けて、電波がない所でも使えます。<b>次からは必ずアイコンから開いてください。</b></p>
+    <dl>
+      <dt>iPhone</dt><dd>Safariで開く → 共有ボタン（□に↑）→「ホーム画面に追加」。LINEから開いた時は、右下の「…」→「Safariで開く」を先に。</dd>
+      <dt>Android</dt><dd>Chromeで開く → 右上の「︙」→「ホーム画面に追加」。</dd>
+    </dl>`)}
+  ${sec('3. スコアの入れ方と集計',`
+    <p><b>スコア</b>：◀▶でホールを移動し、＋−で打数を入れる。最初に押すとパーの数になる。名前の横に「パー」「ボギー」などが出るので、パーの入れ間違いに気づける。</p>
+    <p><b>集計</b>：スコアカードの記号は　—パー　△ボギー　□ダブルボギー　○バーディー　◎イーグル。+3以上は数字。名前の横の「+25（97）」は、パーとの差（合計スコア）。</p>`)}
+  ${sec('4. ラスベガスのルール',`
+    <p>2人ずつのチームで対戦。ハンデを引いたスコアの良い方が「前」、悪い方が「後」。</p>
+    <ul>
+      <li><b>前</b>：前同士の差がそのまま点数</li>
+      <li><b>後</b>：前で勝ったチームが後も勝てば+1。前が同点なら、後で勝ったチームに+1</li>
+      <li><b>バーディー</b>：相手チームの前と後が入れ替わり、取った人のチームに+1</li>
+      <li><b>ニアピン</b>：+1。<b>倍率</b>：そのホールの点数を2倍などに。<b>持ち越し</b>：前のホールが同点の時、勝ったチームに足す</li>
+      <li>ハンデを引いてもパーより良くはならない</li>
+    </ul>
+    <p class="ex"><b>例</b>　Aチーム 4と5、Bチーム 5と6 → 前は4対5でA+1、後も5対6でA+1 → <b>Aが+2</b></p>
+    <p class="ex"><b>例</b>　パー4で、Aチーム 3と5、Bチーム 4と6 → Aのバーディーで、Bは前6・後4に入れ替え。前は3対6でA+3、後は5対4でAが負けたので0、バーディー賞+1 → <b>Aが+4</b></p>`)}
+  ${sec('5. マッチプレーの見方',`
+    <p>自分と相手の1対1で、ホールごとに勝ち負けを数えます。</p>
+    <dl>
+      <dt>アップ／ダウン</dt><dd>何ホール勝ち越し／負け越しているか</dd>
+      <dt>オールスクエア</dt><dd>同点</dd>
+      <dt>ドーミー</dt><dd>差と残りホール数が同じ（次に負けなければ勝ち）</dd>
+      <dt>3&amp;2</dt><dd>残り2ホールで3アップになり、勝ちが決まった</dd>
+    </dl>`)}
+  ${sec('6. 登録と履歴',`
+    <p>履歴を残すのと、主催者としてIDを発行するには、メールアドレスの登録が必要です（「履歴」タブから）。</p>
+    <p>確認メールのリンクは<b>押さずに長押しでコピー</b>し、アプリに貼り付けます。登録すると、機種変更しても履歴が残ります。</p>
+    <p>ラウンドが終わったら、設定画面の一番下「ラウンドを終了する」→「保存して終了」。</p>`)}
+  ${sec('7. よくある質問',`
+    <dl>
+      <dt>途中でアプリを閉じてしまった</dt><dd>IDで参加中なら、もう一度IDを入れて自分の名前を選べば続きから入力できる。</dd>
+      <dt>組が違う</dt><dd>組の変更は主催者が行う。主催者に伝える。</dd>
+      <dt>2人・3人の組</dt><dd>ラスベガスは「しない」にする。単体で使う時は、使わない欄の名前を消す。</dd>
+      <dt>共有データはいつ消える？</dt><dd>開催日の0時から48時間。残したい人は、その前に「保存して終了」。</dd>
+      <dt>同じ組で2人が入力したら？</dt><dd>後から入れた数字が使われる。</dd>
+    </dl>`)}
+  </section>`;}
+
 function mpSet(f){const mp=clone(R.setup.mp); f(mp); mutate(r=>r.setup.mp=clone(mp),{setup:{mp}});}
 function bindMp(){const $=id=>document.getElementById(id);
   if($('oppSel')) $('oppSel').onclick=e=>{const b=e.target.closest('[data-o]'); if(!b) return; const k=+b.dataset.o;
@@ -1172,6 +1241,7 @@ function bindMp(){const $=id=>document.getElementById(id);
 function bind(){
   const $=id=>document.getElementById(id);
   bindShared();
+  if($('helpBack')) $('helpBack').onclick=()=>{L.view=helpFrom||'setup'; saveL(); render(); window.scrollTo(0,0);};
   if(toast){const t=toast; setTimeout(()=>{if(toast===t){toast='';render();}},4000);}
   if(L.view==='setup'){
     if($('shareBtn')) $('shareBtn').onclick=createShared;
@@ -1245,6 +1315,7 @@ function bind(){
 if(L.pmode===undefined) L.pmode=localHasScores()?'solo':'code';
 // ID入りのURL（…#4821）で開いたら、そのまま参加の画面へ
 {const hm=(location.hash||'').match(/^#(\d{4})$/); if(hm&&!(L.link&&L.link.code===hm[1])){L.role='player'; L.pmode='code'; J.code=hm[1]; L.view='setup'; saveL();}}
+document.getElementById('helpBtn').onclick=()=>{if(L.view!=='help') helpFrom=L.view; L.view='help'; render(); window.scrollTo(0,0);};
 render();
 
 if(L.roundId){L.roundId=null;saveL();}
