@@ -350,8 +350,12 @@ function cur(){return shared&&shared.data?shared.data:L.local;}
 /* ---------- rules ---------- */
 // 1Hは設定で選んだオナー順。2H目からは前ホールの実スコア順
 function honorOrder(i){const so=R.setup.order; let o=(Array.isArray(so)&&so.length===4?so:[0,1,2,3]).slice();
-  for(let j=0;j<i;j++){const s=R.holes[j].s; if(s.some(v=>v==null)) continue; o=o.slice().sort((a,b)=>s[a]-s[b]);}
+  const act=R.setup.lvOn?[0,1,2,3]:[0,1,2,3].filter(slotOn); // ラスベガスをしない時は、使っている欄だけで決める
+  o=o.filter(k=>act.includes(k)).concat(o.filter(k=>!act.includes(k)));
+  for(let j=0;j<i;j++){const s=R.holes[j].s; if(act.some(k=>s[k]==null)) continue;
+    o=o.slice().sort((a,b)=>(act.includes(a)?0:1)-(act.includes(b)?0:1)||(act.includes(a)?s[a]-s[b]:0));}
   return o;}
+function ordActive(){return R.setup.lvOn?[0,1,2,3]:[0,1,2,3].filter(slotOn);}
 function teams(i){
   const m=R.setup.mode;
   if(m==='rotate'){const o=honorOrder(i); const A=[o[0],o[[1,2,3][i%3]]]; return {A,B:o.filter(x=>!A.includes(x)),order:o};}
@@ -615,11 +619,11 @@ function vSetup(){
     <input type="text" id="course" value="${esc(s.course)}" placeholder="例：○○カントリークラブ"${L.link?' readonly':''}>
     <div class="label">プレーヤーの名前</div>
     <div class="names">${[0,1,2,3].map(k=>`<label>${k+1}人目<input type="text" id="name${k}" value="${esc(s.names[k])}"${L.link?' readonly':''}></label>`).join('')}</div>
-    ${s.lvOn?`    <div class="label">1番ホールのオナー順</div>
-    <div class="ordnow">${(ordPick?ordPick:s.order).map((k,j)=>`<span><b>${j+1}</b>${esc(N(k))}</span>`).join('')}${ordPick?[...Array(4-ordPick.length)].map((_,j)=>`<span class="empty"><b>${ordPick.length+j+1}</b>？</span>`).join(''):''}</div>
-    ${ordPick?`<div class="chips" id="ordSel">${[0,1,2,3].filter(k=>!ordPick.includes(k)).map(k=>`<button class="chip" data-ord="${k}">${esc(N(k))}</button>`).join('')}<button class="chip" id="ordCancel">やめる</button></div><div class="note">打つ順番に名前をタップしてください。</div>`
+    ${(()=>{const act=ordActive(), cur=(ordPick?ordPick:s.order).filter(k=>act.includes(k)); return `    <div class="label">1番ホールのオナー順</div>
+    <div class="ordnow">${cur.map((k,j)=>`<span><b>${j+1}</b>${esc(N(k))}</span>`).join('')}${ordPick?[...Array(Math.max(0,act.length-cur.length))].map((_,j)=>`<span class="empty"><b>${cur.length+j+1}</b>？</span>`).join(''):''}</div>
+    ${ordPick?`<div class="chips" id="ordSel">${act.filter(k=>!ordPick.includes(k)).map(k=>`<button class="chip" data-ord="${k}">${esc(N(k))}</button>`).join('')}<button class="chip" id="ordCancel">やめる</button></div><div class="note">打つ順番に名前をタップしてください。</div>`
       :`<button class="btn ${s.orderSet?'ghost':'ordbtn'}" id="ordStart">${s.orderSet?'オナー順を決め直す':'オナー順を決める'}</button>`}
-`:''}
+`;})()}
     <div class="label">自分はどの人？</div>
     ${L.link?`<div class="note">自分：${esc(N(0))}（IDで参加中）</div>`:''}<div class="chips" id="meSel"${L.link?' hidden':''}><button class="chip" data-me="" aria-pressed="${s.me==null}">記録しない</button>${[0,1,2,3].map(k=>`<button class="chip" data-me="${k}" aria-pressed="${s.me===k}">${esc(N(k))}</button>`).join('')}</div>
     <div class="note">自分のパット数のみ記録できます。ポイントの計算には影響しません。</div>
@@ -691,7 +695,8 @@ function vHole(){
   const LV=!!R.setup.lvOn;
   const team=k=>!LV||!t?'none':t.A.includes(k)?'A':'B';
   const pr=i>0?compute(i-1):null, prevTie=pr&&pr.ptsA===0;
-  const orderLine=t&&t.order?`<div class="pairline order"><span class="nw">打順：${esc(N(t.order[0]))}</span>${t.order.slice(1).map(k=>` <span class="nw">→ ${esc(N(k))}</span>`).join('')}</div>`:'';
+  const ordOf=LV?(t&&t.order):honorOrder(i).filter(slotOn);
+  const orderLine=ordOf&&ordOf.length?`<div class="pairline order"><span class="nw">打順：${esc(N(ordOf[0]))}</span>${ordOf.slice(1).map(k=>` <span class="nw">→ ${esc(N(k))}</span>`).join('')}</div>`:'';
   const pairText=t?`<b style="color:var(--teamA)">${t.A.map(k=>`<span class="nw">${esc(N(k))}</span>`).join('・')}</b> vs <b style="color:var(--teamB)">${t.B.map(k=>`<span class="nw">${esc(N(k))}</span>`).join('・')}</b>`:'ペア未決定';
   const kan=LV&&R.setup.mode==='kankan'?`<section class="card"><div class="label">カンカン：${esc(N(0))}さんのパートナー</div><div class="chips" id="kanP">${[1,2,3].map(k=>`<button class="chip" data-p="${k}" aria-pressed="${H.partner===k}">${esc(N(k))}</button>`).join('')}</div></section>`:'';
   const players=[0,1,2,3].filter(k=>LV||slotOn(k)).map(k=>{const hc=LV?hcpOf(i,k):0;
@@ -726,7 +731,7 @@ function vHole(){
       <div class="num">${i+1}<small>H</small></div>
       <button class="navbtn" id="next" ${i===HOLES-1?'disabled':''} aria-label="次のホール">▶</button></div>
     ${L.link?`<div class="row" style="justify-content:center"><span class="label">PAR</span><b class="parfix">${H.par}</b><span class="note">（主催者が登録）</span></div>`:`<div class="row" style="justify-content:center"><span class="label">PAR</span><div class="chips" id="par">${[3,4,5].map(p=>`<button class="chip" data-par="${p}" aria-pressed="${H.par===p}">${p}</button>`).join('')}</div></div>`}
-    ${!LV?'':i===0&&!R.setup.orderSet?`<button class="ordwarn" id="ordGo">設定からオナー順を登録してください<small>タップで設定を開きます</small></button>`
+    ${!LV?(R.setup.orderSet?orderLine:''):i===0&&!R.setup.orderSet?`<button class="ordwarn" id="ordGo">設定からオナー順を登録してください<small>タップで設定を開きます</small></button>`
       :`${orderLine}<div class="pairline">${pairText}</div>`}
   </section>
   <section class="card" id="players">${players}</section>
@@ -1271,8 +1276,9 @@ function bind(){
       arr[k][p]=Math.max(0,(Number(arr[k][p])||0)+(+b.dataset.d)); mutate(r=>r.setup[f]=clone(arr),{setup:{[f]:arr}});});
     if($('ordStart')) $('ordStart').onclick=()=>{ordPick=[];render();};
     if($('ordCancel')) $('ordCancel').onclick=()=>{ordPick=null;render();};
-    document.querySelectorAll('[data-ord]').forEach(b=>b.onclick=()=>{ordPick.push(+b.dataset.ord);
-      if(ordPick.length===3) ordPick.push([0,1,2,3].find(k=>!ordPick.includes(k)));
+    document.querySelectorAll('[data-ord]').forEach(b=>b.onclick=()=>{ordPick.push(+b.dataset.ord); const act=ordActive();
+      if(ordPick.length===act.length-1) ordPick.push(act.find(k=>!ordPick.includes(k)));
+      if(ordPick.length>=act.length){ordPick=ordPick.concat([0,1,2,3].filter(k=>!ordPick.includes(k)));}
       if(ordPick.length===4){const o=ordPick.slice(); ordPick=null; mutate(r=>{r.setup.order=o.slice();r.setup.orderSet=true;},{setup:{order:o,orderSet:true}});} else render();});
     $('meSel').onclick=e=>{const b=e.target.closest('[data-me]'); if(!b) return; const v=b.dataset.me===''?null:+b.dataset.me; mutate(r=>r.setup.me=v,{setup:{me:v}});};
     // ラスベガス・マッチプレーの設定を開く／閉じる（一度開くと、ボタンは普通の色に戻る）
