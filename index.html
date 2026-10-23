@@ -152,6 +152,8 @@ input[type=email]{font:inherit;font-size:17px;color:var(--fg);background:var(--b
 .editbox{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:12px}
 .elist{display:flex;flex-direction:column;gap:6px}
 .erow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+.secbtn{display:flex;justify-content:space-between;align-items:center;font-size:18px;padding:14px 16px}
+.secbtn span{font-size:14px;font-weight:500;opacity:.9}
 .btn.ordbtn{background:var(--danger);border-color:var(--danger);color:var(--card)}
 .ordnow{display:flex;flex-wrap:wrap;gap:6px 14px}
 .ordnow span{display:flex;align-items:center;gap:6px;font-weight:700}
@@ -296,7 +298,7 @@ const today=()=>new Date().toLocaleDateString('sv-SE');
 const clone=o=>JSON.parse(JSON.stringify(o));
 function blankHole(){return {par:4,s:[null,null,null,null],h:[0,0,0,0],partner:null,np:null,carry:0,mult:1,putt:null};}
 function blankHoles(){return Array.from({length:HOLES},blankHole);}
-function defaultSetup(){return {me:null,date:'',course:'',names:['Aさん','Bさん','Cさん','Dさん'],order:[0,1,2,3],orderSet:false,mode:'rotate',fixedPartner:1,
+function defaultSetup(){return {me:null,date:'',course:'',names:['Aさん','Bさん','Cさん','Dさん'],order:[0,1,2,3],orderSet:false,lvSeen:false,mpSeen:false,mode:'rotate',fixedPartner:1,
   hcp:['none','none','none','none'],hcpPar:[0,1,2,3].map(()=>({3:0,4:1,5:2})),split:false,
   hcp2:['none','none','none','none'],hcpPar2:[0,1,2,3].map(()=>({3:0,4:1,5:2})),
   mp:defaultMp()};}
@@ -597,7 +599,8 @@ function vSetup(){
     ${L.link?`<div class="note">自分：${esc(N(0))}（IDで参加中）</div>`:''}<div class="chips" id="meSel"${L.link?' hidden':''}><button class="chip" data-me="" aria-pressed="${s.me==null}">記録しない</button>${[0,1,2,3].map(k=>`<button class="chip" data-me="${k}" aria-pressed="${s.me===k}">${esc(N(k))}</button>`).join('')}</div>
     <div class="note">パット数は自分用のメモです。ポイントの計算には使いません。</div>
   </section>
-  <section class="card">
+  <button class="btn ${s.lvSeen?'ghost':'ordbtn'} secbtn" id="lvToggle" aria-expanded="${lvOpen}">ラスベガス<span>${lvOpen?'閉じる ▲':'チーム・ハンデを決める ▼'}</span></button>
+  ${lvOpen?`<section class="card">
     <div class="label">ペアの組み方</div>
     <div class="opt">
       ${opt('mode','rotate',s.mode,'ローテーション','1Hは上で決めたオナー順。2H目からは前ホールの実スコア（ハンデ抜き）のオナー順で、1・2 vs 3・4 → 1・3 vs 2・4 → 1・4 vs 2・3 をくり返し')}
@@ -613,8 +616,9 @@ function vSetup(){
     ${hcpBlock(s,0)}
     ${s.split?`<div class="half">後半（10〜18H）</div>${hcpBlock(s,1)}`:''}
     <div class="note">前半・後半で分けると、10H目から後半のハンデに切り替わります（途中で変えても大丈夫です）。オール1：全ホールで1打引く。パー別：パー3・4・5ごとに引く打数を決める。ホール毎：スコア画面でホールごとに＋−で入れる。ハンデを引いてもパーより良くはなりません。</div>
-  </section>
-  ${mpSetupCard(s)}
+  </section>`:''}
+  <button class="btn ${s.mpSeen?'ghost':'ordbtn'} secbtn" id="mpToggle" aria-expanded="${mpOpen}">マッチプレー<span>${mpOpen?'閉じる ▲':'対戦相手・ハンデを決める ▼'}</span></button>
+  ${mpOpen?mpSetupCard(s):''}
   <button class="btn" id="go">スコア入力へ</button>
   <div id="roundArea">${roundCard()}</div>`;
 }
@@ -832,7 +836,7 @@ const fmtD=d=>{const p=String(d||'').split('-'); return p.length===3?`${+p[1]}�
 const shareUrl=code=>`https://hmsr16.github.io/golf/#${code}`;
 const evTitle=ev=>ev.name||ev.course||'コンペ';
 
-let orgPick=null, curEv=null, J={step:'code',code:'',msg:'',early:false,me:null,picks:[]}, galMsg='', galEarly=false, orgMsg='', grmAsk=null, ormAsk=null, evDelAsk=null, orgEdit=null, prmAsk=null, rankOpen=null, regMsg='', regDel=false, busy=false;
+let lvOpen=false, mpOpen=false, orgPick=null, curEv=null, J={step:'code',code:'',msg:'',early:false,me:null,picks:[]}, galMsg='', galEarly=false, orgMsg='', grmAsk=null, ormAsk=null, evDelAsk=null, orgEdit=null, prmAsk=null, rankOpen=null, regMsg='', regDel=false, busy=false;
 let REG=null, HIST=[], unsubH=null, regStep=null, regMail='', regLink='';
 
 // 登録の状態と履歴の読み込み
@@ -1173,7 +1177,7 @@ function bind(){
     [0,1,2,3].forEach(k=>$('name'+k).onchange=e=>mutate(r=>r.setup.names[k]=e.target.value,{setup:{names:R.setup.names.map((n,j)=>j===k?e.target.value:n)}}));
     document.querySelectorAll('input[name=mode]').forEach(x=>x.onchange=e=>mutate(r=>r.setup.mode=e.target.value,{setup:{mode:e.target.value}}));
     const fp=$('fixedP'); if(fp) fp.onclick=e=>{const b=e.target.closest('[data-p]'); if(b) mutate(r=>r.setup.fixedPartner=+b.dataset.p,{setup:{fixedPartner:+b.dataset.p}});};
-    $('split').onclick=e=>{const b=e.target.closest('[data-s]'); if(!b) return; const on=b.dataset.s==='1';
+    if($('split')) $('split').onclick=e=>{const b=e.target.closest('[data-s]'); if(!b) return; const on=b.dataset.s==='1';
       const s=R.setup, n={split:on}; if(on&&!s.split){n.hcp2=s.hcp.slice(); n.hcpPar2=clone(s.hcpPar);}
       mutate(r=>Object.assign(r.setup,clone(n)),{setup:n});};
     document.querySelectorAll('[data-hcp]').forEach(g=>g.onclick=e=>{const b=e.target.closest('[data-hv]'); if(!b) return;
@@ -1187,6 +1191,9 @@ function bind(){
       if(ordPick.length===3) ordPick.push([0,1,2,3].find(k=>!ordPick.includes(k)));
       if(ordPick.length===4){const o=ordPick.slice(); ordPick=null; mutate(r=>{r.setup.order=o.slice();r.setup.orderSet=true;},{setup:{order:o,orderSet:true}});} else render();});
     $('meSel').onclick=e=>{const b=e.target.closest('[data-me]'); if(!b) return; const v=b.dataset.me===''?null:+b.dataset.me; mutate(r=>r.setup.me=v,{setup:{me:v}});};
+    // ラスベガス・マッチプレーの設定を開く／閉じる（一度開くと、ボタンは普通の色に戻る）
+    $('lvToggle').onclick=()=>{lvOpen=!lvOpen; if(lvOpen&&!R.setup.lvSeen) mutate(r=>r.setup.lvSeen=true,{setup:{lvSeen:true}}); else render();};
+    $('mpToggle').onclick=()=>{mpOpen=!mpOpen; if(mpOpen&&!R.setup.mpSeen) mutate(r=>r.setup.mpSeen=true,{setup:{mpSeen:true}}); else render();};
     $('go').onclick=()=>setTab('hole');
     bindMp();
   } else if(L.view==='hole'){
