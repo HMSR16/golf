@@ -620,9 +620,9 @@ function vSetup(){
     ${ordPick?`<div class="chips" id="ordSel">${[0,1,2,3].filter(k=>!ordPick.includes(k)).map(k=>`<button class="chip" data-ord="${k}">${esc(N(k))}</button>`).join('')}<button class="chip" id="ordCancel">やめる</button></div><div class="note">打つ順番に名前をタップしてください。</div>`
       :`<button class="btn ${s.orderSet?'ghost':'ordbtn'}" id="ordStart">${s.orderSet?'オナー順を決め直す':'オナー順を決める'}</button>`}
 `:''}
-    <div class="label">自分はどの人？（パット数を記録する人）</div>
+    <div class="label">自分はどの人？</div>
     ${L.link?`<div class="note">自分：${esc(N(0))}（IDで参加中）</div>`:''}<div class="chips" id="meSel"${L.link?' hidden':''}><button class="chip" data-me="" aria-pressed="${s.me==null}">記録しない</button>${[0,1,2,3].map(k=>`<button class="chip" data-me="${k}" aria-pressed="${s.me===k}">${esc(N(k))}</button>`).join('')}</div>
-    <div class="note">パット数は自分用のメモです。ポイントの計算には使いません。</div>
+    <div class="note">自分のパット数のみ記録できます。ポイントの計算には影響しません。</div>
   </section>
   <button class="btn ${s.lvSeen?'ghost':'ordbtn'} secbtn" id="lvToggle" aria-expanded="${lvOpen}">ラスベガス<span>${lvOpen?'閉じる ▲':(s.lvOn?'する':'しない')+'・設定 ▼'}</span></button>
   ${lvOpen?`${onOff('lv',s.lvOn)}${s.lvOn?`<section class="card">

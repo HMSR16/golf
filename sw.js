@@ -1,6 +1,6 @@
 // 電波がなくても開けるように、アプリのファイルをスマホに保存しておく。
 // 新しい版があれば、電波のある時に取り込み、次に開いた時から新しい版になる。
-const CACHE='vegas-v14';
+const CACHE='vegas-v15';
 const FILES=['./','./index.html','./manifest.webmanifest','./icons/apple-touch-icon.png','./icons/icon-192.png','./icons/icon-512.png','./icons/favicon-32.png','./backend-firebase.js'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting()));});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
