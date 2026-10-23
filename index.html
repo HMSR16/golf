@@ -731,7 +731,7 @@ function vHole(){
       <div class="num">${i+1}<small>H</small></div>
       <button class="navbtn" id="next" ${i===HOLES-1?'disabled':''} aria-label="次のホール">▶</button></div>
     ${L.link?`<div class="row" style="justify-content:center"><span class="label">PAR</span><b class="parfix">${H.par}</b><span class="note">（主催者が登録）</span></div>`:`<div class="row" style="justify-content:center"><span class="label">PAR</span><div class="chips" id="par">${[3,4,5].map(p=>`<button class="chip" data-par="${p}" aria-pressed="${H.par===p}">${p}</button>`).join('')}</div></div>`}
-    ${!LV?(R.setup.orderSet?orderLine:''):i===0&&!R.setup.orderSet?`<button class="ordwarn" id="ordGo">設定からオナー順を登録してください<small>タップで設定を開きます</small></button>`
+    ${!LV?(i===0&&!R.setup.orderSet?`<button class="ordwarn" id="ordGo">設定からオナー順を登録してください<small>タップで設定を開きます</small></button>`:orderLine):i===0&&!R.setup.orderSet?`<button class="ordwarn" id="ordGo">設定からオナー順を登録してください<small>タップで設定を開きます</small></button>`
       :`${orderLine}<div class="pairline">${pairText}</div>`}
   </section>
   <section class="card" id="players">${players}</section>
