@@ -152,6 +152,7 @@ input[type=email]{font:inherit;font-size:17px;color:var(--fg);background:var(--b
 .editbox{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:12px}
 .elist{display:flex;flex-direction:column;gap:6px}
 .erow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+.onoff .chip{min-width:96px;min-height:44px;font-size:18px;font-weight:700}
 .secbtn{display:flex;justify-content:space-between;align-items:center;font-size:18px;padding:14px 16px}
 .secbtn span{font-size:14px;font-weight:500;opacity:.9}
 .btn.ordbtn{background:var(--danger);border-color:var(--danger);color:var(--card)}
@@ -298,13 +299,14 @@ const today=()=>new Date().toLocaleDateString('sv-SE');
 const clone=o=>JSON.parse(JSON.stringify(o));
 function blankHole(){return {par:4,s:[null,null,null,null],h:[0,0,0,0],partner:null,np:null,carry:0,mult:1,putt:null};}
 function blankHoles(){return Array.from({length:HOLES},blankHole);}
-function defaultSetup(){return {me:null,date:'',course:'',names:['Aさん','Bさん','Cさん','Dさん'],order:[0,1,2,3],orderSet:false,lvSeen:false,mpSeen:false,mode:'rotate',fixedPartner:1,
+function defaultSetup(){return {me:null,date:'',course:'',names:['Aさん','Bさん','Cさん','Dさん'],order:[0,1,2,3],orderSet:false,lvSeen:false,mpSeen:false,lvOn:false,mpOn:false,mode:'rotate',fixedPartner:1,
   hcp:['none','none','none','none'],hcpPar:[0,1,2,3].map(()=>({3:0,4:1,5:2})),split:false,
   hcp2:['none','none','none','none'],hcpPar2:[0,1,2,3].map(()=>({3:0,4:1,5:2})),
   mp:defaultMp()};}
 // マッチプレー：opps=対戦する同伴者, ext=場外の人のid(4〜), names/xs=場外の人の名前とスコア, mh=対戦ごとのハンデ
 function defaultMp(){return {opps:[],ext:[],names:{},xs:{},mh:{},cap:true,lk:{}};}
-function fixSetup(s){const d=defaultSetup(); for(const k in d) if(s[k]==null&&k!=='me') s[k]=clone(d[k]); if(s.me===undefined) s.me=null; delete s.rate;
+function fixSetup(s){if(s.lvOn===undefined) s.lvOn=true; if(s.mpOn===undefined) s.mpOn=!!(s.mp&&((s.mp.opps||[]).length||(s.mp.ext||[]).length));
+  const d=defaultSetup(); for(const k in d) if(s[k]==null&&k!=='me') s[k]=clone(d[k]); if(s.me===undefined) s.me=null; delete s.rate;
   const dm=defaultMp(); for(const k in dm) if(s.mp[k]==null) s.mp[k]=clone(dm[k]); return s;}
 function fixHoles(hs){return Array.from({length:HOLES},(_,i)=>Object.assign(blankHole(),hs&&hs[i]||{}));}
 
@@ -389,10 +391,12 @@ function scMark(g,par){if(g==null) return '';const d=g-par;
   if(d<=-2) return '<span class="mk">◎</span>'; if(d===-1) return '<span class="mk">○</span>'; if(d===0) return '<span class="mk">—</span>';
   if(d===1) return '<span class="mk">△</span>'; if(d===2) return '<span class="mk sq">□</span>'; return '+'+d;}
 function scoreCards(){const pars=R.holes.map(H=>H.par);
-  return [0,1,2,3].map(k=>cardFor(N(k),R.holes.map(H=>H.s[k]),pars,R.setup.me===k)).join('')
+  return [0,1,2,3].filter(slotOn).map(k=>cardFor(N(k),R.holes.map(H=>H.s[k]),pars,R.setup.me===k)).join('')
     +`<div class="note">実際のスコア（ハンデなし）。—パー、△ボギー、□ダブルボギー、○バーディー、◎イーグル。+3はパーより3打多い。</div>`;}
 function withR(r,f){const o=R;R=r;try{return f();}finally{R=o;}}
 const N=k=>R.setup.names[k]||('P'+(k+1));
+// 使っている欄か（2人・3人の組では、名前のない欄・空きの欄は表示しない）
+const slotOn=k=>{const n=String(R.setup.names[k]||'').trim(); return n!==''&&n!=='（空き）';};
 const sign=v=>v>0?'+'+v:String(v);
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
@@ -402,7 +406,7 @@ const MN=k=>isExt(k)?(R.setup.mp.names[k]||'場外'):N(k);
 // 場外の相手がIDの参加者なら、共有のスコアを自動で使う
 const mpSc=(i,k)=>{if(!isExt(k)) return R.holes[i].s[k]??null; const lk=R.setup.mp.lk&&R.setup.mp.lk[k];
   if(lk&&curEv&&R===L.local) return (curEv.scores[lk]||[])[i]??null; return (R.setup.mp.xs[k]||[])[i]??null;};
-function mpMatches(){const s=R.setup, me=s.me; if(me==null||!s.mp) return [];
+function mpMatches(){const s=R.setup, me=s.me; if(me==null||!s.mp||!s.mpOn) return [];
   return s.mp.opps.filter(o=>o!==me&&o<4).concat(s.mp.ext).map(o=>({a:me,b:o}));}
 // ハンデは対戦ごと。who: none=なし / me=自分がもらう / opp=相手がもらう
 // mode: par=パー3・4・5ごと / holes=選んだホールで各1打
@@ -520,7 +524,7 @@ async function finishRound(keep){
   render();
 }
 function histText(rec){return withR(rec,()=>{const t=totals();
-  return [`${rec.date} ${rec.setup.course||''}`.trim(),...[0,1,2,3].map(k=>`${N(k)}：${sign(t.tot[k])}pt（スコア${t.gro[k]||'-'}）`),...mpText()].join('\n');});}
+  return [`${rec.date} ${rec.setup.course||''}`.trim(),...[0,1,2,3].filter(slotOn).map(k=>R.setup.lvOn===false?`${N(k)}：スコア${t.gro[k]||'-'}`:`${N(k)}：${sign(t.tot[k])}pt（スコア${t.gro[k]||'-'}）`),...mpText()].join('\n');});}
 
 /* ---------- views ---------- */
 function setTab(v){L.view=v;histOpen=null;histDel=null;saveL();render();}
@@ -581,6 +585,10 @@ function endCard(){
 }
 function hcpBlock(s,h){const T=h?s.hcp2:s.hcp, P=h?s.hcpPar2:s.hcpPar;
   return `<div class="hcpgrid">${[0,1,2,3].map(k=>`<div>${esc(N(k))}</div><div class="chips" data-hcp="${k}" data-half="${h}">${[['none','なし'],['all1','オール1'],['par','パー別'],['hole','ホール毎']].map(([v,l])=>`<button class="chip" data-hv="${v}" aria-pressed="${T[k]===v}">${l}</button>`).join('')}</div>${T[k]==='par'?`<div class="parh">${[3,4,5].map(p=>`<div class="mini-step"><span>パー${p}</span><button data-pk="${k}" data-pp="${p}" data-half="${h}" data-d="-1" aria-label="パー${p}のハンデを減らす">−</button><b>${P[k][p]}</b><button data-pk="${k}" data-pp="${p}" data-half="${h}" data-d="1" aria-label="パー${p}のハンデを増やす">＋</button></div>`).join('')}</div>`:''}`).join('')}</div>`;}
+// ラスベガス・マッチプレーを「する／しない」
+function onOff(kind,on){const nm=kind==='lv'?'ラスベガス':'マッチプレー';
+  return `<section class="card"><div class="label">${nm}を</div><div class="chips onoff" id="${kind}On"><button class="chip" data-on="1" aria-pressed="${on}">する</button><button class="chip" data-on="0" aria-pressed="${!on}">しない</button></div>
+    ${kind==='lv'&&on?'<div class="note">ラスベガスは4人で行います。</div>':''}${kind==='lv'&&!on?'<div class="note">しない時は、スコア画面はスコアの入力だけになります。2人・3人の組では、使わない欄の名前を消すと、その欄は表示されません。</div>':''}</section>`;}
 function vSetup(){
   const s=R.setup;
   return `
@@ -591,16 +599,17 @@ function vSetup(){
     <input type="text" id="course" value="${esc(s.course)}" placeholder="例：○○カントリークラブ"${L.link?' readonly':''}>
     <div class="label">プレーヤーの名前</div>
     <div class="names">${[0,1,2,3].map(k=>`<label>${k+1}人目<input type="text" id="name${k}" value="${esc(s.names[k])}"${L.link?' readonly':''}></label>`).join('')}</div>
-    <div class="label">1番ホールのオナー順</div>
+    ${s.lvOn?`    <div class="label">1番ホールのオナー順</div>
     <div class="ordnow">${(ordPick?ordPick:s.order).map((k,j)=>`<span><b>${j+1}</b>${esc(N(k))}</span>`).join('')}${ordPick?[...Array(4-ordPick.length)].map((_,j)=>`<span class="empty"><b>${ordPick.length+j+1}</b>？</span>`).join(''):''}</div>
     ${ordPick?`<div class="chips" id="ordSel">${[0,1,2,3].filter(k=>!ordPick.includes(k)).map(k=>`<button class="chip" data-ord="${k}">${esc(N(k))}</button>`).join('')}<button class="chip" id="ordCancel">やめる</button></div><div class="note">打つ順番に名前をタップしてください。</div>`
       :`<button class="btn ${s.orderSet?'ghost':'ordbtn'}" id="ordStart">${s.orderSet?'オナー順を決め直す':'オナー順を決める'}</button>`}
+`:''}
     <div class="label">自分はどの人？（パット数を記録する人）</div>
     ${L.link?`<div class="note">自分：${esc(N(0))}（IDで参加中）</div>`:''}<div class="chips" id="meSel"${L.link?' hidden':''}><button class="chip" data-me="" aria-pressed="${s.me==null}">記録しない</button>${[0,1,2,3].map(k=>`<button class="chip" data-me="${k}" aria-pressed="${s.me===k}">${esc(N(k))}</button>`).join('')}</div>
     <div class="note">パット数は自分用のメモです。ポイントの計算には使いません。</div>
   </section>
-  <button class="btn ${s.lvSeen?'ghost':'ordbtn'} secbtn" id="lvToggle" aria-expanded="${lvOpen}">ラスベガス<span>${lvOpen?'閉じる ▲':'チーム・ハンデを決める ▼'}</span></button>
-  ${lvOpen?`<section class="card">
+  <button class="btn ${s.lvSeen?'ghost':'ordbtn'} secbtn" id="lvToggle" aria-expanded="${lvOpen}">ラスベガス<span>${lvOpen?'閉じる ▲':(s.lvOn?'する':'しない')+'・設定 ▼'}</span></button>
+  ${lvOpen?`${onOff('lv',s.lvOn)}${s.lvOn?`<section class="card">
     <div class="label">ペアの組み方</div>
     <div class="opt">
       ${opt('mode','rotate',s.mode,'ローテーション','1Hは上で決めたオナー順。2H目からは前ホールの実スコア（ハンデ抜き）のオナー順で、1・2 vs 3・4 → 1・3 vs 2・4 → 1・4 vs 2・3 をくり返し')}
@@ -616,9 +625,9 @@ function vSetup(){
     ${hcpBlock(s,0)}
     ${s.split?`<div class="half">後半（10〜18H）</div>${hcpBlock(s,1)}`:''}
     <div class="note">前半・後半で分けると、10H目から後半のハンデに切り替わります（途中で変えても大丈夫です）。オール1：全ホールで1打引く。パー別：パー3・4・5ごとに引く打数を決める。ホール毎：スコア画面でホールごとに＋−で入れる。ハンデを引いてもパーより良くはなりません。</div>
-  </section>`:''}
-  <button class="btn ${s.mpSeen?'ghost':'ordbtn'} secbtn" id="mpToggle" aria-expanded="${mpOpen}">マッチプレー<span>${mpOpen?'閉じる ▲':'対戦相手・ハンデを決める ▼'}</span></button>
-  ${mpOpen?mpSetupCard(s):''}
+  </section>`:''}`:''}
+  <button class="btn ${s.mpSeen?'ghost':'ordbtn'} secbtn" id="mpToggle" aria-expanded="${mpOpen}">マッチプレー<span>${mpOpen?'閉じる ▲':(s.mpOn?'する':'しない')+'・設定 ▼'}</span></button>
+  ${mpOpen?onOff('mp',s.mpOn)+(s.mpOn?mpSetupCard(s):''):''}
   <button class="btn" id="go">スコア入力へ</button>
   <div id="roundArea">${roundCard()}</div>`;
 }
@@ -663,18 +672,19 @@ function mpHoleCard(i){const ms=mpMatches().filter(m=>!isExt(m.b)); if(!ms.lengt
   return `<section class="card"><div class="label">マッチプレー（同伴者・${i+1}Hまで）</div><div class="mlist">${rows}</div>${anyH?'<div class="note">（ ）内はマッチプレーのハンデを引いたスコアです。</div>':''}</section>`;}
 function vHole(){
   const i=L.cur, H=R.holes[i], t=teams(i), r=compute(i);
-  const team=k=>!t?'none':t.A.includes(k)?'A':'B';
+  const LV=!!R.setup.lvOn;
+  const team=k=>!LV||!t?'none':t.A.includes(k)?'A':'B';
   const pr=i>0?compute(i-1):null, prevTie=pr&&pr.ptsA===0;
   const orderLine=t&&t.order?`<div class="pairline order"><span class="nw">打順：${esc(N(t.order[0]))}</span>${t.order.slice(1).map(k=>` <span class="nw">→ ${esc(N(k))}</span>`).join('')}</div>`:'';
   const pairText=t?`<b style="color:var(--teamA)">${t.A.map(k=>`<span class="nw">${esc(N(k))}</span>`).join('・')}</b> vs <b style="color:var(--teamB)">${t.B.map(k=>`<span class="nw">${esc(N(k))}</span>`).join('・')}</b>`:'ペア未決定';
-  const kan=R.setup.mode==='kankan'?`<section class="card"><div class="label">カンカン：${esc(N(0))}さんのパートナー</div><div class="chips" id="kanP">${[1,2,3].map(k=>`<button class="chip" data-p="${k}" aria-pressed="${H.partner===k}">${esc(N(k))}</button>`).join('')}</div></section>`:'';
-  const players=[0,1,2,3].map(k=>{const hc=hcpOf(i,k);
+  const kan=LV&&R.setup.mode==='kankan'?`<section class="card"><div class="label">カンカン：${esc(N(0))}さんのパートナー</div><div class="chips" id="kanP">${[1,2,3].map(k=>`<button class="chip" data-p="${k}" aria-pressed="${H.partner===k}">${esc(N(k))}</button>`).join('')}</div></section>`:'';
+  const players=[0,1,2,3].filter(k=>LV||slotOn(k)).map(k=>{const hc=LV?hcpOf(i,k):0;
     return `<div class="player ${team(k)}">
       <div class="pname"><span class="tag">${team(k)==='A'?'チームA':team(k)==='B'?'チームB':'　'}</span>
         <span>${esc(N(k))}${scoreBadge(H.s[k],H.par)}</span>
-        <span class="sub">${hc?`ハンデ${hc} → ネット ${H.s[k]==null?'–':net(i,k)}${H.s[k]!=null&&usedHcp(i,k)<hc?'（パーまで）':''}`:'ハンデなし'}</span></div>
+        ${LV?`<span class="sub">${hc?`ハンデ${hc} → ネット ${H.s[k]==null?'–':net(i,k)}${H.s[k]!=null&&usedHcp(i,k)<hc?'（パーまで）':''}`:'ハンデなし'}</span>`:''}</div>
       <div class="step"><button data-k="${k}" data-d="-1" aria-label="${esc(N(k))} 1打減らす">−</button><span class="val">${H.s[k]??'–'}</span><button data-k="${k}" data-d="1" aria-label="${esc(N(k))} 1打増やす">＋</button></div>
-      ${hcfg(i).type[k]==='hole'?`<div class="hh">このホールのハンデ<div class="mini-step"><button data-hk="${k}" data-d="-1" aria-label="ハンデを減らす">−</button><b>${H.h[k]}</b><button data-hk="${k}" data-d="1" aria-label="ハンデを増やす">＋</button></div></div>`:''}
+      ${LV&&hcfg(i).type[k]==='hole'?`<div class="hh">このホールのハンデ<div class="mini-step"><button data-hk="${k}" data-d="-1" aria-label="ハンデを減らす">−</button><b>${H.h[k]}</b><button data-hk="${k}" data-d="1" aria-label="ハンデを増やす">＋</button></div></div>`:''}
     </div>`}).join('');
   let res;
   if(!t) res=`<div class="note">パートナーを選ぶと計算します。</div>`;
@@ -700,18 +710,18 @@ function vHole(){
       <div class="num">${i+1}<small>H</small></div>
       <button class="navbtn" id="next" ${i===HOLES-1?'disabled':''} aria-label="次のホール">▶</button></div>
     ${L.link?`<div class="row" style="justify-content:center"><span class="label">PAR</span><b class="parfix">${H.par}</b><span class="note">（主催者が登録）</span></div>`:`<div class="row" style="justify-content:center"><span class="label">PAR</span><div class="chips" id="par">${[3,4,5].map(p=>`<button class="chip" data-par="${p}" aria-pressed="${H.par===p}">${p}</button>`).join('')}</div></div>`}
-    ${i===0&&!R.setup.orderSet?`<button class="ordwarn" id="ordGo">設定からオナー順を登録してください<small>タップで設定を開きます</small></button>`
+    ${!LV?'':i===0&&!R.setup.orderSet?`<button class="ordwarn" id="ordGo">設定からオナー順を登録してください<small>タップで設定を開きます</small></button>`
       :`${orderLine}<div class="pairline">${pairText}</div>`}
   </section>
   <section class="card" id="players">${players}</section>
   ${kan}
   ${R.setup.me!=null?`<section class="card mine"><div class="row" style="justify-content:space-between"><div><div class="label">パット数（${esc(N(R.setup.me))}・自分用）</div><div class="note">計算には入りません</div></div><div class="step" id="putt"><button data-pd="-1" aria-label="パットを1減らす">−</button><span class="val">${H.putt??'–'}</span><button data-pd="1" aria-label="パットを1増やす">＋</button></div></div></section>`:''}
-  <section class="card"><div class="label">ニアピン</div><div class="chips" id="np"><button class="chip" data-np="" aria-pressed="${H.np==null}">なし</button>${[0,1,2,3].map(k=>`<button class="chip" data-np="${k}" aria-pressed="${H.np===k}">${esc(N(k))}</button>`).join('')}</div></section>
+  ${LV?`  <section class="card"><div class="label">ニアピン</div><div class="chips" id="np"><button class="chip" data-np="" aria-pressed="${H.np==null}">なし</button>${[0,1,2,3].map(k=>`<button class="chip" data-np="${k}" aria-pressed="${H.np===k}">${esc(N(k))}</button>`).join('')}</div></section>
   <section class="card"><div class="extra">
     <div><div class="label">持ち越しポイント</div><div class="mini-step big"><button data-x="carry" data-d="-1" aria-label="持ち越しを減らす">−</button><b>${Number(H.carry)||0}</b><button data-x="carry" data-d="1" aria-label="持ち越しを増やす">＋</button></div>${prevTie?`<div class="note">前のホールは同点でした</div>`:''}</div>
     <div><div class="label">倍率</div><div class="mini-step big"><button data-x="mult" data-d="-1" aria-label="倍率を下げる">−</button><b>×${Number(H.mult)||1}</b><button data-x="mult" data-d="1" aria-label="倍率を上げる">＋</button></div></div>
   </div></section>
-  <section class="result">${res}</section>
+  <section class="result">${res}</section>`:''}
   ${mpHoleCard(i)}`;
 }
 function sumTable(clickable){
@@ -734,7 +744,7 @@ function sumTable(clickable){
   </tbody></table></div>
   <div class="note">各マスは上がポイント、下が実際のスコア（H＝実際に引いたハンデ。パーより良くはならないので、設定より少ないことがあります）。×は倍率、越は持ち越し${R.setup.me!=null?'、パは自分のパット数':''}。${clickable?'行をタップするとそのホールを開きます。':''}</div>`;
 }
-function vSum(){return `${L.link&&curEv?`<section class="card"><div class="label">順位表</div>${rankHtml(rankRows(curEv),curEv.pars,L.link.pid)}</section>`:''}<section class="card"><div class="label">合計ポイント${R.setup.course?`　${esc(R.setup.course)}`:''}</div>${sumTable(true)}</section><section class="card"><div class="label">スコアカード</div>${scoreCards()}</section>${mpMatches().length?`<section class="card"><div class="label">マッチプレー</div>${mpSummary(true)}</section>`:''}`;}
+function vSum(){return `${L.link&&curEv?`<section class="card"><div class="label">順位表</div>${rankHtml(rankRows(curEv),curEv.pars,L.link.pid)}</section>`:''}${R.setup.lvOn?`<section class="card"><div class="label">合計ポイント${R.setup.course?`　${esc(R.setup.course)}`:''}</div>${sumTable(true)}</section>`:''}<section class="card"><div class="label">スコアカード</div>${scoreCards()}</section>${mpMatches().length?`<section class="card"><div class="label">マッチプレー</div>${mpSummary(true)}</section>`:''}`;}
 function vHistInner(){
   const list=allHistory();
   if(histOpen){const rec=list.find(h=>h.id===histOpen); if(!rec){histOpen=null;return vHist();}
@@ -753,7 +763,7 @@ function vHistInner(){
   if(!list.length) return `<section class="card"><div class="label">履歴</div><div class="note">保存したラウンドはまだありません。ラウンドが終わったら「設定」の「ラウンドを終了する」から保存すると、ここに並びます。</div></section>`;
   return `<section class="card"><div class="label">履歴（保存したラウンド）</div><div class="opt">${list.map(h=>{
     const names=(h.setup&&h.setup.names)||[];
-    return `<button class="joinitem" data-hist="${esc(h.id)}"><b>${esc(h.date)}　${esc(h.setup.course||'')}</b><span>${names.map((n,k)=>`${esc(n)} ${sign((h.tot||[])[k]||0)}`).join('　')}</span></button>`;}).join('')}</div>
+    return `<button class="joinitem" data-hist="${esc(h.id)}"><b>${esc(h.date)}　${esc(h.setup.course||'')}</b><span>${names.map((n,k)=>h.setup.lvOn===false?((h.gro||[])[k]?`${esc(n)} ${(h.gro||[])[k]}`:''):`${esc(n)} ${sign((h.tot||[])[k]||0)}`).filter(Boolean).join('　')}</span></button>`;}).join('')}</div>
     <div class="note">履歴は登録したアカウントに保存されます${IS_DEMO?'（試し用の今は、このスマホの中に保存しています）':''}。</div></section>`;
 }
 
@@ -1192,6 +1202,8 @@ function bind(){
       if(ordPick.length===4){const o=ordPick.slice(); ordPick=null; mutate(r=>{r.setup.order=o.slice();r.setup.orderSet=true;},{setup:{order:o,orderSet:true}});} else render();});
     $('meSel').onclick=e=>{const b=e.target.closest('[data-me]'); if(!b) return; const v=b.dataset.me===''?null:+b.dataset.me; mutate(r=>r.setup.me=v,{setup:{me:v}});};
     // ラスベガス・マッチプレーの設定を開く／閉じる（一度開くと、ボタンは普通の色に戻る）
+    document.querySelectorAll('#lvOn [data-on],#mpOn [data-on]').forEach(b=>b.onclick=()=>{const f=b.closest('.onoff').id==='lvOn'?'lvOn':'mpOn', v=b.dataset.on==='1';
+      mutate(r=>r.setup[f]=v,{setup:{[f]:v}});});
     $('lvToggle').onclick=()=>{lvOpen=!lvOpen; if(lvOpen&&!R.setup.lvSeen) mutate(r=>r.setup.lvSeen=true,{setup:{lvSeen:true}}); else render();};
     $('mpToggle').onclick=()=>{mpOpen=!mpOpen; if(mpOpen&&!R.setup.mpSeen) mutate(r=>r.setup.mpSeen=true,{setup:{mpSeen:true}}); else render();};
     $('go').onclick=()=>setTab('hole');
@@ -1213,7 +1225,7 @@ function bind(){
       const v=f==='carry'?Math.max(0,(Number(H.carry)||0)+d):Math.max(1,(Number(H.mult)||1)+d);
       mutate(r=>r.holes[i][f]=v,holePatch(i,{[f]:v}));});
     if($('putt')) $('putt').onclick=e=>{const b=e.target.closest('[data-pd]'); if(!b) return; const v=H.putt==null?2:Math.max(0,H.putt+(+b.dataset.pd)); mutate(r=>r.holes[i].putt=v,holePatch(i,{putt:v}));};
-    $('np').onclick=e=>{const b=e.target.closest('[data-np]'); if(!b) return; const v=b.dataset.np===''?null:+b.dataset.np; mutate(r=>r.holes[i].np=v,holePatch(i,{np:v}));};
+    if($('np')) $('np').onclick=e=>{const b=e.target.closest('[data-np]'); if(!b) return; const v=b.dataset.np===''?null:+b.dataset.np; mutate(r=>r.holes[i].np=v,holePatch(i,{np:v}));};
     const kp=$('kanP'); if(kp) kp.onclick=e=>{const b=e.target.closest('[data-p]'); if(b) mutate(r=>r.holes[i].partner=+b.dataset.p,holePatch(i,{partner:+b.dataset.p}));};
   } else if(L.view==='sum'){
     document.querySelectorAll('[data-go]').forEach(tr=>tr.onclick=()=>{L.cur=+tr.dataset.go;setTab('hole');});
