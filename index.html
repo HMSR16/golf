@@ -781,6 +781,7 @@ function demoBackend(){
     async removeFromGroup(code,pid){const a=all(), ev=a[code]; if(!ev) return; const k=grp(ev,pid); if(!k) return;
       const G=ev.groups[k]; G.members=G.members.filter(x=>x!==pid); if(!G.members.length) delete ev.groups[k]; save(a); notify(code);},
     async cleanup(){},
+    async deleteEvent(code){const a=all(); delete a[code]; save(a); notify(code);},
     // 主催者が組を決める（ほかの組に入っていた人は、その組から移す）
     async setGroup(code,gid,members){const a=all(), ev=a[code]; if(!ev) return;
       for(const k in ev.groups){if(k!==gid){ev.groups[k].members=ev.groups[k].members.filter(x=>!members.includes(x)); if(!ev.groups[k].members.length) delete ev.groups[k];}}
@@ -830,7 +831,7 @@ const fmtD=d=>{const p=String(d||'').split('-'); return p.length===3?`${+p[1]}�
 const shareUrl=code=>`https://hmsr16.github.io/golf/#${code}`;
 const evTitle=ev=>ev.name||ev.course||'コンペ';
 
-let orgPick=null, curEv=null, J={step:'code',code:'',msg:'',early:false,me:null,picks:[]}, galMsg='', galEarly=false, orgMsg='', grmAsk=null, ormAsk=null, orgEdit=null, prmAsk=null, rankOpen=null, regMsg='', regDel=false, busy=false;
+let orgPick=null, curEv=null, J={step:'code',code:'',msg:'',early:false,me:null,picks:[]}, galMsg='', galEarly=false, orgMsg='', grmAsk=null, ormAsk=null, evDelAsk=null, orgEdit=null, prmAsk=null, rankOpen=null, regMsg='', regDel=false, busy=false;
 let REG=null, HIST=[], unsubH=null, regStep=null, regMail='', regLink='';
 
 // 登録の状態と履歴の読み込み
@@ -847,7 +848,7 @@ if(B.auth.isLink(location.href)){regLink=location.href; regStep='sent'; L.view='
 function syncLinked(){curEv=null; const lk=L.link; if(!lk) return;
   const ev=Shared.get(lk.code), st=Shared.status(lk.code);
   if(st==='loading') return;
-  if(!ev){toast='共有の期限が切れたため、共有から外れました。このスマホのスコアは残っています。'; L.link=null; saveL(); return;}
+  if(!ev){toast='イベントが終了したか削除されたため、共有から外れました。このスマホのスコアは残っています。'; L.link=null; saveL(); return;}
   const G=ev.groups[lk.gid];
   // 参加した直後（20秒以内）は、共有データの更新が届くのを待つ
   if((!G||!G.members.includes(lk.pid))&&lk.at&&Date.now()-lk.at<20000){setTimeout(remoteRender,1000); return;}
@@ -912,6 +913,8 @@ function evCard(ev){const inG=new Set(Object.values(ev.groups).flatMap(G=>G.memb
     ${orgPick&&orgPick.code===ev.code&&!ev.groups[orgPick.gid]?pickBox(ev,orgPick.gid):`<button class="btn ghost" data-gnew="${ev.code}">${gs.length?'次の組を決める':'1組目を決める'}</button>`}
     ${rest.length?`<div class="note">まだ組に入っていない人：${rest.map(p=>esc(p.name)).join('・')}</div>`:''}
     ${orgEdit===ev.code?evEdit(ev):`<button class="btn ghost" data-oedit="${ev.code}">内容を直す（パー・参加者）</button>`}
+    ${evDelAsk===ev.code?`<div class="confirm"><div>このイベント（ID ${ev.code}）を削除しますか？ 組み合わせと、全員が入力したスコアも消えます。参加中の人も共有から外れます。元に戻せません。</div><div class="row"><button class="btn danger" id="evDelYes">削除する</button><button class="btn ghost" id="evDelNo">やめる</button></div></div>`
+      :`<button class="btn danger" data-evdel="${ev.code}">このイベントを削除</button>`}
   </section>`;}
 // 発行後の修正（発行した主催者だけ）。開催日は変えられない
 function evEdit(ev){const hasSc=pid=>(ev.scores[pid]||[]).some(v=>v!=null);
@@ -1030,6 +1033,11 @@ function bindShared(){const $=id=>document.getElementById(id);
   if($('gSave')) $('gSave').onclick=()=>{const {code,gid,sel}=orgPick; orgPick=null;
     B.setGroup(code,gid,sel).then(()=>{toast=sel.length?`${gid}組を決めました。`:`${gid}組をなくしました。`; render();}).catch(()=>{toast='組を決められませんでした。このIDを発行した人のスマホから、電波の良い所でお試しください。'; render();}); render();};
   if($('ormNo')) $('ormNo').onclick=()=>{ormAsk=null;render();};
+  document.querySelectorAll('[data-evdel]').forEach(b=>b.onclick=()=>{evDelAsk=b.dataset.evdel; render();});
+  if($('evDelNo')) $('evDelNo').onclick=()=>{evDelAsk=null; render();};
+  if($('evDelYes')) $('evDelYes').onclick=()=>{const code=evDelAsk; evDelAsk=null; if(orgEdit===code) orgEdit=null; if(orgPick&&orgPick.code===code) orgPick=null;
+    B.deleteEvent(code).then(()=>{L.myEvents=myEvents().filter(e=>e.code!==code); saveL(); toast=`イベント（ID ${code}）を削除しました。`; render();})
+      .catch(()=>{toast='削除できませんでした。このIDを発行した人のスマホから、電波の良い所でお試しください。'; render();}); render();};
   document.querySelectorAll('[data-oedit]').forEach(b=>b.onclick=()=>{orgEdit=b.dataset.oedit; prmAsk=null; render();});
   if($('eDone')) $('eDone').onclick=()=>{orgEdit=null; prmAsk=null; render();};
   const eev=orgEdit&&Shared.get(orgEdit), edErr=()=>{toast='直せませんでした。このIDを発行したスマホからのみ直せます。電波も確かめてください。'; render();};

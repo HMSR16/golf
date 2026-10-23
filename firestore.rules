@@ -17,7 +17,8 @@ service cloud.firestore {
         && request.auth != null && request.auth.uid == resource.data.owner
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['groups', 'pars', 'players'])
         && okEvent(request.resource.data);
-      allow delete: if request.time > resource.data.expireAt;
+      allow delete: if request.time > resource.data.expireAt
+        || (request.auth != null && request.auth.uid == resource.data.owner);
       match /scores/{pid} {
         allow read, create, update: if evExists(code) && request.time < evData(code).expireAt;
         allow delete: if !evExists(code) || request.time > evData(code).expireAt

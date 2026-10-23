@@ -56,6 +56,10 @@
       return db.runTransaction(async t=>{const s=await t.get(ref); if(!s.exists) return; const g=s.data().groups||{}, k=grp(g,pid); if(!k) return;
         const m=g[k].members.filter(x=>x!==pid);
         t.update(ref,m.length?{['groups.'+k+'.members']:m}:{['groups.'+k]:FV.delete()});});},
+    // 主催者がイベントを削除する（スコア→イベントの順に消す）
+    async deleteEvent(code){const ref=evRef(code);
+      const q=await ref.collection('scores').get(); for(const d of q.docs){await d.ref.delete();}
+      await ref.delete();},
     // 期限が過ぎたイベントのデータを消す（発行した人のスマホで行う）
     async cleanup(code){const ref=evRef(code);
       for(let j=1;j<=60;j++){try{await ref.collection('scores').doc('p'+j).delete();}catch(e){}}
