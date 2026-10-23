@@ -822,6 +822,7 @@ const Shared={
   setScore(code,pid,i,v){const ev=EV[code]; if(ev) (ev.scores[pid]||(ev.scores[pid]=Array(HOLES).fill(null)))[i]=v;
     return B.setScore(code,pid,i,v).catch(()=>{toast='スコアを送れませんでした。電波の良い所でもう一度入力してください。'; render();});}
 };
+const errCode=e=>e&&e.code?`（エラー：${e.code}）`:'';
 const netErr=()=>{toast='通信できませんでした。電波の良い所でもう一度お試しください。'; render();};
 
 const pName=(ev,pid)=>{const p=ev.players.find(x=>x.id===pid); return p?p.name:'?';};
@@ -1040,7 +1041,7 @@ function bindShared(){const $=id=>document.getElementById(id);
   if($('evDelNo')) $('evDelNo').onclick=()=>{evDelAsk=null; render();};
   if($('evDelYes')) $('evDelYes').onclick=()=>{const code=evDelAsk; evDelAsk=null; if(orgEdit===code) orgEdit=null; if(orgPick&&orgPick.code===code) orgPick=null;
     B.deleteEvent(code).then(()=>{L.myEvents=myEvents().filter(e=>e.code!==code); saveL(); toast=`イベント（ID ${code}）を削除しました。`; render();})
-      .catch(()=>{toast='削除できませんでした。このIDを発行した人のスマホから、電波の良い所でお試しください。'; render();}); render();};
+      .catch(e=>{toast='削除できませんでした。このIDを発行した人のスマホから、電波の良い所でお試しください。'+errCode(e); render();}); render();};
   document.querySelectorAll('[data-oedit]').forEach(b=>b.onclick=()=>{orgEdit=b.dataset.oedit; prmAsk=null; render();});
   if($('eDone')) $('eDone').onclick=()=>{orgEdit=null; prmAsk=null; render();};
   const eev=orgEdit&&Shared.get(orgEdit), edErr=()=>{toast='直せませんでした。このIDを発行したスマホからのみ直せます。電波も確かめてください。'; render();};
