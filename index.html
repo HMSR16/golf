@@ -145,6 +145,9 @@ input[type=email]{font:inherit;font-size:17px;color:var(--fg);background:var(--b
 .rh{font-family:var(--font-num);font-size:20px;font-weight:700;text-align:center}
 .ropen{padding:8px 0}
 .nw{white-space:nowrap}
+.pbtn.taken{background:var(--line);color:var(--muted);border-color:var(--line)}
+.swatch{display:inline-block;width:12px;height:12px;border-radius:3px;border:1px solid var(--line);background:var(--card);vertical-align:-1px;margin-right:3px}
+.swatch.taken{background:var(--line)}
 .pickbox{display:flex;flex-direction:column;gap:8px;border:2px solid var(--accent);border-radius:10px;padding:10px}
 .editbox{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:12px}
 .elist{display:flex;flex-direction:column;gap:6px}
@@ -894,7 +897,8 @@ function myEvents(){const now=Date.now(); return (L.myEvents||[]).map(e=>typeof 
 function pickBox(ev,g){const sel=orgPick.sel;
   return `<div class="pickbox"><b>${g}組の人を選んでください（最大4人）</b>
     <div class="plist">${ev.players.map(p=>{const og=groupOf(ev,p.id), on=sel.includes(p.id);
-      return `<button class="pbtn${on?' on':''}" data-gsel="${p.id}" aria-pressed="${on}">${esc(p.name)}${og&&og!==g?`<small>今は${og}組</small>`:''}</button>`;}).join('')}</div>
+      return `<button class="pbtn${on?' on':og&&og!==g?' taken':''}" data-gsel="${p.id}" aria-pressed="${on}">${esc(p.name)}${og&&og!==g?`<small>今は${og}組</small>`:''}</button>`;}).join('')}</div>
+    <div class="note"><span class="swatch taken"></span>灰色＝ほかの組に入っている人（選ぶとこの組に移ります）　<span class="swatch"></span>白＝まだ組に入っていない人</div>
     <div class="note">${g}組：${sel.length?sel.map(x=>esc(pName(ev,x))).join('・'):'まだ選んでいません'}</div>
     <div class="row"><button class="btn" id="gSave">${g}組をこの人で決める</button><button class="btn ghost" id="gCancel">やめる</button></div></div>`;}
 function evCard(ev){const inG=new Set(Object.values(ev.groups).flatMap(G=>G.members)), rest=ev.players.filter(p=>!inG.has(p.id));
