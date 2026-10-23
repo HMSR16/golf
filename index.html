@@ -1,0 +1,1065 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#1f6b45">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ラスベガス">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;-webkit-text-size-adjust:100%}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>ラスベガス計算</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Barlow+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: one-column scorecard. Sticky tab bar, hole card, result strip, totals table. */
+:root{
+  --bg:#f3f5f0; --card:#ffffff; --fg:#1d2a22; --muted:#66746b; --line:#d9e0d8;
+  --accent:#1f6b45; --accent-soft:#e2efe6; --mine:#fff1c2; --teamA:#1756c9; --teamA-soft:#d9e5fb;
+  --teamB:#cf2f3a; --teamB-soft:#fbdcde; --gold:#a8861c; --danger:#b23a3a;
+  --font-body:"Zen Kaku Gothic New", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --font-num:"Barlow Condensed", "Arial Narrow", sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121815; --card:#1b231e; --fg:#e7ede8; --muted:#9aa89f; --line:#2c3830;
+  --accent:#5cc28c; --accent-soft:#1f3328; --mine:#3d3417; --teamA:#6ea2ff; --teamA-soft:#1a2a4a;
+  --teamB:#ff6b74; --teamB-soft:#4a1c22; --gold:#e0bd52; --danger:#ec7a7a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121815; --card:#1b231e; --fg:#e7ede8; --muted:#9aa89f; --line:#2c3830;
+  --accent:#5cc28c; --accent-soft:#1f3328; --mine:#3d3417; --teamA:#6ea2ff; --teamA-soft:#1a2a4a;
+  --teamB:#ff6b74; --teamB-soft:#4a1c22; --gold:#e0bd52; --danger:#ec7a7a; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 40px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:12px 8px;display:flex;flex-direction:column;gap:10px}
+h1{font-size:19px;margin:0;font-weight:700;letter-spacing:.02em}
+h1 small{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:3px}
+.tabs button{border:0;background:none;color:var(--muted);font:inherit;font-weight:700;padding:8px 0;border-radius:8px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--accent);color:var(--bg)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:12px}
+.label{font-size:12px;color:var(--muted);letter-spacing:.06em;font-weight:700}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+input[type=text],input[type=number]{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-width:0}
+.names{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.names label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--bg);color:var(--fg);font:inherit;font-size:14px;padding:7px 12px;border-radius:999px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--bg);font-weight:700}
+.opt{display:flex;flex-direction:column;gap:8px}
+.optitem{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;gap:10px;align-items:flex-start;cursor:pointer;background:var(--bg)}
+.optitem.on{border-color:var(--accent);background:var(--accent-soft)}
+.optitem b{display:block}
+.optitem span{font-size:12.5px;color:var(--muted)}
+.optitem input{margin-top:4px;accent-color:var(--accent)}
+.hcpgrid{display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:center}
+.btn{font:inherit;font-weight:700;border-radius:10px;padding:11px 14px;border:1px solid var(--accent);background:var(--accent);color:var(--bg);cursor:pointer}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn.danger{border-color:var(--danger);background:transparent;color:var(--danger)}
+.btn:focus-visible,.chip:focus-visible,.tabs button:focus-visible,.step button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.holenav{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.holenav .num{font-family:var(--font-num);font-size:40px;font-weight:700;line-height:1;text-align:center}
+.holenav .num small{font-size:16px;color:var(--muted);margin-left:2px}
+.navbtn{width:46px;height:46px;border-radius:50%;border:1px solid var(--line);background:var(--bg);color:var(--fg);font-size:20px;cursor:pointer}
+.navbtn:disabled{opacity:.3}
+.pairline{font-size:13px;text-align:center;color:var(--muted)}
+.scard{display:flex;flex-direction:column;gap:6px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.scard.me{background:var(--mine);margin:0 -8px;padding:8px 8px 14px;border-radius:10px}
+.schead{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.schead b{font-size:19px}
+.sctot{margin-left:auto;font-family:var(--font-num);font-size:26px;font-weight:700;background:var(--teamA);color:var(--card);padding:0 10px;border-radius:6px}
+.sctot small{font-size:18px;font-weight:500;margin-left:2px}
+.scg{display:grid;grid-template-columns:repeat(9,minmax(0,1fr)) minmax(0,1.4fr);border:1px solid var(--line);border-radius:6px;overflow:hidden;font-variant-numeric:tabular-nums}
+.scg>div{text-align:center;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+.scg>div:nth-child(10n){border-right:0}
+.scg .sh{background:var(--accent);color:var(--card);font-family:var(--font-num);font-size:17px;font-weight:700;padding:2px 0}
+.scg .sp{background:var(--bg);color:var(--muted);font-size:13px;padding:1px 0}
+.scg .sv{background:var(--card);font-family:var(--font-num);font-size:20px;font-weight:700;min-height:34px;display:flex;align-items:center;justify-content:center;border-bottom:0}
+.scg .sv.tot{font-size:22px}
+.mk{font-family:var(--font-body);font-size:20px;font-weight:400;line-height:1}
+.mk.sq{font-size:27px}
+.hsel{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:4px}
+.hs{font:inherit;font-family:var(--font-num);font-size:18px;font-weight:700;line-height:1.05;padding:5px 0;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer;min-height:44px}
+.hs small{display:block;font-size:11px;font-weight:500;color:var(--muted)}
+.hs[aria-pressed="true"]{background:var(--gold);border-color:var(--gold);color:var(--card)}
+.hs[aria-pressed="true"] small{color:var(--card)}
+tr.sub td{background:var(--accent-soft);font-weight:700;border-bottom:2px solid var(--line)}
+tr.sub td:first-child{color:var(--accent)}
+.ordwarn{display:block;width:100%;font:inherit;text-align:center;font-weight:700;font-size:18px;line-height:1.4;color:var(--card);background:var(--danger);border:0;border-radius:12px;padding:14px 12px;cursor:pointer}
+.ordwarn small{display:block;font-size:13px;font-weight:500;opacity:.9;margin-top:2px}
+#par{gap:10px}
+#par .chip{min-width:76px;min-height:44px;font-size:19px;font-weight:700;font-family:var(--font-num)}
+/* ---- 主催者・プレーヤー・ギャラリー ---- */
+.roles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.rolebtn{font:inherit;font-weight:700;font-size:17px;padding:12px 4px;border-radius:12px;border:2px solid var(--accent);background:var(--card);color:var(--accent);cursor:pointer;min-height:48px}
+.rolebtn[aria-pressed="true"]{background:var(--accent);color:var(--card)}
+.note.demo{color:var(--gold)}
+.evhead{display:flex;flex-direction:column;gap:2px}
+.evhead b{font-size:19px}
+.coderow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.coderow input{font-family:var(--font-num);font-size:26px;letter-spacing:.3em;text-align:center}
+.or{text-align:center;color:var(--muted);font-size:13px}
+.plist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.pbtn{font:inherit;font-weight:700;font-size:16px;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer;min-height:48px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.pbtn small{font-size:12px;font-weight:500;color:var(--muted)}
+.pbtn.on{background:var(--accent);border-color:var(--accent);color:var(--card)} .pbtn.on small{color:var(--card)}
+.pbtn:disabled{opacity:.45;cursor:not-allowed}
+.ask{font-size:17px}
+.card.linked{border:2px solid var(--accent)}
+.bigcode{font-family:var(--font-num);font-size:56px;font-weight:700;letter-spacing:.2em;text-align:center;color:var(--accent);line-height:1}
+.urlrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.url{font-family:var(--font-num);font-size:16px;word-break:break-all;-webkit-user-select:all;user-select:all;min-width:0;flex:1 1 200px}
+.grow{display:flex;flex-direction:column;gap:4px;padding:8px 0;border-top:1px solid var(--line)}
+.pgrid{display:grid;grid-template-columns:repeat(9,minmax(0,1fr)) minmax(0,1.3fr);gap:3px}
+.pc{font:inherit;font-family:var(--font-num);font-size:13px;color:var(--muted);line-height:1.1;padding:4px 0;border-radius:8px;border:1px solid var(--line);background:var(--card);cursor:pointer;min-height:48px;text-align:center}
+.pc b{display:block;font-size:22px;color:var(--fg)}
+.pc.tot{background:var(--bg);cursor:default}
+.warnTxt{color:var(--danger);font-weight:700}
+.regmsg{font-size:17px;font-weight:700;color:var(--danger)}
+input[type=email]{font:inherit;font-size:17px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-width:0}
+.parfix{font-family:var(--font-num);font-size:24px}
+.rank{display:flex;flex-direction:column}
+.rhead,.rrow{display:grid;grid-template-columns:40px minmax(0,1fr) auto 40px;gap:8px;align-items:center}
+.rhead{font-size:12px;color:var(--card);background:var(--teamA);padding:6px 8px;border-radius:8px 8px 0 0;font-weight:700}
+.rrow{font:inherit;color:var(--fg);background:var(--card);border:0;border-bottom:1px solid var(--line);padding:10px 8px;text-align:left;cursor:pointer;width:100%}
+.rrow.mine{background:var(--mine)}
+.rrow.open{background:var(--accent-soft)}
+.rn{font-family:var(--font-num);font-size:22px;font-weight:700;text-align:center}
+.rname{font-size:17px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rsc{font-family:var(--font-num);font-size:22px;font-weight:700;background:var(--teamA);color:var(--card);border-radius:6px;padding:0 8px;white-space:nowrap}
+.rsc small{font-size:15px;font-weight:500;margin-left:2px}
+.rh{font-family:var(--font-num);font-size:20px;font-weight:700;text-align:center}
+.ropen{padding:8px 0}
+.nw{white-space:nowrap}
+.btn.ordbtn{background:var(--danger);border-color:var(--danger);color:var(--card)}
+.ordnow{display:flex;flex-wrap:wrap;gap:6px 14px}
+.ordnow span{display:flex;align-items:center;gap:6px;font-weight:700}
+.ordnow b{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--accent);color:var(--card);font-family:var(--font-num);font-size:15px}
+.ordnow .empty{color:var(--muted)} .ordnow .empty b{background:var(--line);color:var(--muted)}
+.pairline.order{font-size:17px;color:var(--fg)}
+.player{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:10px;border-radius:10px}
+.player.A{background:var(--teamA-soft);border-left:6px solid var(--teamA)}
+.player.B{background:var(--teamB-soft);border-left:6px solid var(--teamB)}
+.player.A .tag,.player.B .tag{align-self:flex-start;color:var(--card);padding:1px 8px;border-radius:999px;margin-bottom:2px}
+.player.A .tag{background:var(--teamA)} .player.B .tag{background:var(--teamB)}
+.player.none{background:var(--bg)}
+.pname{font-weight:700;display:flex;flex-direction:column;min-width:0;font-size:19px;line-height:1.35}
+.pname .tag{font-size:12.5px;font-weight:700;letter-spacing:.06em}
+.A .tag{color:var(--teamA)} .B .tag{color:var(--teamB)}
+.pname .sub{font-size:13.5px;color:var(--muted);font-weight:400}
+.badge{display:inline-block;font-size:14px;padding:1px 9px;vertical-align:2px;border-radius:999px;background:var(--gold);color:var(--card);margin-left:4px;font-weight:700}
+.step{display:flex;align-items:center;gap:4px}
+.step button{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--fg);font-size:20px;cursor:pointer}
+.step .val{font-family:var(--font-num);font-size:30px;font-weight:700;width:42px;text-align:center;font-variant-numeric:tabular-nums}
+.hh{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);grid-column:1/-1}
+.hh input{width:64px;padding:4px 8px}
+.result{border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);background:var(--card)}
+.result .big{font-family:var(--font-num);font-size:30px;font-weight:700;line-height:1.1}
+.bd{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;font-size:13.5px;font-variant-numeric:tabular-nums}
+.bd .k{color:var(--muted)}
+.bd .p{font-family:var(--font-num);font-size:17px;font-weight:600;text-align:right}
+.note{font-size:12.5px;color:var(--muted)}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:14px}
+th,td{padding:6px 6px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+thead th{font-size:14px;color:var(--muted);font-weight:700}
+td.num{font-family:var(--font-num);font-size:21px}
+tr.total td{font-weight:700;border-top:2px solid var(--fg)}
+.pos{color:var(--teamA)} .neg{color:var(--teamB)}
+.parh{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px 12px;padding:2px 0 6px}
+.mini-step{display:flex;align-items:center;gap:4px;font-size:12.5px;color:var(--muted)}
+.mini-step button{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);font-size:16px;cursor:pointer}
+.mini-step b{font-family:var(--font-num);font-size:20px;color:var(--fg);min-width:18px;text-align:center}
+.sc{font-size:14px;color:var(--muted);line-height:1.2}
+.hc{margin-left:3px;color:var(--gold);font-weight:700}
+td .num{font-family:var(--font-num);font-size:21px;line-height:1.2}
+.extra{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mini-step.big button{width:40px;height:40px;font-size:20px}
+.mini-step.big b{font-size:28px;min-width:40px}
+.half{font-size:13px;font-weight:700;color:var(--accent);border-top:1px solid var(--line);padding-top:10px}
+.live{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--accent);background:var(--accent-soft);border-radius:10px;padding:8px 12px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.3}}
+@media (prefers-reduced-motion: reduce){.dot{animation:none}}
+.toast{font-size:13.5px;background:var(--card);border:1px solid var(--accent);border-radius:10px;padding:10px 12px}
+.toast.warn{border-color:var(--danger);color:var(--danger)}
+.joinitem{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;width:100%}
+.joinitem span{font-size:12.5px;color:var(--muted)}
+.joinitem:focus-visible,.btn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+textarea{font:inherit;width:100%;min-height:120px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px}
+.mine{border-style:dashed}
+.pt{margin-left:3px;color:var(--accent);font-weight:700}
+.meh{color:var(--fg)!important}
+.mytag{font-size:10.5px;color:var(--card);background:var(--accent);padding:0 6px;border-radius:999px}
+table.mc0 :is(td,th):nth-child(2),table.mc1 :is(td,th):nth-child(3),table.mc2 :is(td,th):nth-child(4),table.mc3 :is(td,th):nth-child(5){background:var(--mine)}
+.badge.par{background:var(--accent-soft);color:var(--accent)}
+.badge.over{background:var(--line);color:var(--fg)}
+.wl{display:flex;flex-direction:column;align-items:flex-end;font-size:14px;line-height:1.3;font-weight:700}
+.confirm{border:1px solid var(--danger);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px}
+/* ---- マッチプレー ---- */
+.mlist{display:flex;flex-direction:column;gap:8px}
+.mrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;background:var(--bg);border:1px solid var(--line)}
+.mrow > div{min-width:0}
+.mstat{font-weight:700;text-align:right;font-size:14.5px}
+.vs{font-size:12px;color:var(--muted);font-weight:700}
+.na{color:var(--teamA)} .nb{color:var(--teamB)}
+.mblock{display:flex;flex-direction:column;gap:8px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.mblock:last-child{border-bottom:0;padding-bottom:0}
+.mhead{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
+.mbig{font-family:var(--font-num);font-size:26px;font-weight:700;line-height:1.1}
+.mgrid{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:3px}
+.mc{border-radius:6px;text-align:center;padding:2px 0;background:var(--bg);border:1px solid var(--line);font-size:10.5px;line-height:1.15;color:var(--muted);font-variant-numeric:tabular-nums}
+.mc b{display:block;font-family:var(--font-num);font-size:16px;color:var(--fg)}
+.mc.a{background:var(--teamA-soft);border-color:var(--teamA)} .mc.b{background:var(--teamB-soft);border-color:var(--teamB)}
+.mc.off{opacity:.4}
+.mc.cur{outline:2px solid var(--gold);outline-offset:1px}
+.mc[data-go]{cursor:pointer}
+.metag{display:inline-block;font-size:10.5px;font-weight:700;color:var(--card);background:var(--accent);border-radius:999px;padding:0 7px;margin-left:4px;vertical-align:2px}
+.ext{display:inline-block;font-size:10.5px;font-weight:700;color:var(--gold);border:1px solid var(--gold);border-radius:999px;padding:0 7px;margin-left:4px;vertical-align:2px}
+.extrow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center}
+.extrow input{font-size:19px}
+.extrow .chip{font-size:16px;padding:8px 12px}
+.bulk{display:grid;grid-template-columns:1fr;gap:8px}
+@media (min-width:560px){.bulk{grid-template-columns:1fr 1fr;grid-auto-flow:column;grid-template-rows:repeat(9,auto);column-gap:18px}}
+.bulk .mini-step{justify-content:space-between;font-size:16px}
+.bulk .mini-step button{width:44px;height:44px;font-size:22px;border-radius:10px}
+.bulk .mini-step b{font-size:28px;min-width:44px}
+.bulk .hn{font-family:var(--font-num);font-size:24px;color:var(--fg);font-weight:600;min-width:80px}
+.bulk .hn small{color:var(--muted);font-size:16px;margin-left:6px}
+.bulk + .note{font-size:15px}
+.hbox{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--bg);display:flex;flex-direction:column;gap:8px}
+.hbox .parh{padding:0}
+.terms{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:12.5px;color:var(--muted)}
+.terms b{color:var(--fg);white-space:nowrap}
+/* 入力欄の文字が16px未満だとiPhoneがタップ時に自動で拡大するので、17pxにそろえる */
+input[type=text],input[type=number],textarea{font-size:17px}
+input[type=date]{font:inherit;font-size:17px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:block;width:100%;max-width:100%;min-width:0;min-height:44px;box-sizing:border-box;-webkit-appearance:none;appearance:none}
+/* iPhoneの日付欄が枠からはみ出さないように */
+input[type=date]::-webkit-date-and-time-value{text-align:left;margin:0}
+input[type=date]::-webkit-datetime-edit{padding:0}
+/* 設定画面だけ、文字を1サイズ大きく */
+.setupv{font-size:17px}
+.setupv .label,.setupv .note,.setupv .names label,.setupv .optitem span,.setupv .terms,.setupv .vs{font-size:14px}
+.setupv .chip{font-size:16px}
+.setupv .mini-step{font-size:14px}
+.setupv .mini-step b{font-size:23px}
+.setupv .half{font-size:15px}
+.setupv .metag,.setupv .ext{font-size:12px}
+.setupv .extrow input{font-size:21px}
+.setupv .extrow .chip{font-size:18px}
+.setupv .bulk .mini-step{font-size:18px}
+.setupv .bulk .mini-step b{font-size:32px}
+.setupv .bulk .hn{font-size:27px}
+.setupv .bulk .hn small{font-size:18px}
+.setupv .bulk + .note{font-size:17px}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>ラスベガス<small>ローカルルール版</small></h1>
+    <div class="tabs" role="tablist">
+      <button id="tab-setup" role="tab" data-v="setup">設定</button>
+      <button id="tab-hole" role="tab" data-v="hole">スコア</button>
+      <button id="tab-sum" role="tab" data-v="sum">集計</button>
+      <button id="tab-hist" role="tab" data-v="hist">履歴</button>
+    </div>
+  </header>
+  <main id="view"></main>
+</div>
+
+<script>
+const HOLES=18;
+const LS='vegas-local-v1';
+const today=()=>new Date().toLocaleDateString('sv-SE');
+const clone=o=>JSON.parse(JSON.stringify(o));
+function blankHole(){return {par:4,s:[null,null,null,null],h:[0,0,0,0],partner:null,np:null,carry:0,mult:1,putt:null};}
+function blankHoles(){return Array.from({length:HOLES},blankHole);}
+function defaultSetup(){return {me:null,date:'',course:'',names:['Aさん','Bさん','Cさん','Dさん'],order:[0,1,2,3],orderSet:false,mode:'rotate',fixedPartner:1,
+  hcp:['none','none','none','none'],hcpPar:[0,1,2,3].map(()=>({3:0,4:1,5:2})),split:false,
+  hcp2:['none','none','none','none'],hcpPar2:[0,1,2,3].map(()=>({3:0,4:1,5:2})),
+  mp:defaultMp()};}
+// マッチプレー：opps=対戦する同伴者, ext=場外の人のid(4〜), names/xs=場外の人の名前とスコア, mh=対戦ごとのハンデ
+function defaultMp(){return {opps:[],ext:[],names:{},xs:{},mh:{},cap:true,lk:{}};}
+function fixSetup(s){const d=defaultSetup(); for(const k in d) if(s[k]==null&&k!=='me') s[k]=clone(d[k]); if(s.me===undefined) s.me=null; delete s.rate;
+  const dm=defaultMp(); for(const k in dm) if(s.mp[k]==null) s.mp[k]=clone(dm[k]); return s;}
+function fixHoles(hs){return Array.from({length:HOLES},(_,i)=>Object.assign(blankHole(),hs&&hs[i]||{}));}
+
+/* ---------- per-viewer state (this phone only) ---------- */
+let L=null;
+try{L=JSON.parse(localStorage.getItem(LS));}catch(e){}
+if(!L||typeof L!=='object') L={};
+if(!L.local){L.local={setup:L.setup||defaultSetup(),holes:L.holes||blankHoles()};delete L.setup;delete L.holes;}
+fixSetup(L.local.setup); L.local.holes=fixHoles(L.local.holes);
+L.view=L.view||'setup'; L.cur=L.cur||0; L.history=L.history||[]; L.role=L.role||'player';
+if(L.view==='sum'&&false) L.view='sum';
+function saveL(){try{localStorage.setItem(LS,JSON.stringify(L));}catch(e){}}
+
+/* ---------- shared state ---------- */
+let db=null,user=null,myId=null,canWrite=null,ready=false;
+let shared=null;          // {id,data:{setup,holes},meta:{date,createdBy,createdAt},ended:false}
+let unsubRound=null,todayRounds=[],dbHistory=[];
+let pending=null,flushing=false,writeErr='';
+let endStep=null, histOpen=null, histDel=null, toast='';
+let extOpen=null, extDel=null, ordPick=null;
+
+let R=L.local;            // the round currently on screen
+function cur(){return shared&&shared.data?shared.data:L.local;}
+
+/* ---------- rules ---------- */
+// 1Hは設定で選んだオナー順。2H目からは前ホールの実スコア順
+function honorOrder(i){const so=R.setup.order; let o=(Array.isArray(so)&&so.length===4?so:[0,1,2,3]).slice();
+  for(let j=0;j<i;j++){const s=R.holes[j].s; if(s.some(v=>v==null)) continue; o=o.slice().sort((a,b)=>s[a]-s[b]);}
+  return o;}
+function teams(i){
+  const m=R.setup.mode;
+  if(m==='rotate'){const o=honorOrder(i); const A=[o[0],o[[1,2,3][i%3]]]; return {A,B:o.filter(x=>!A.includes(x)),order:o};}
+  const p=m==='fixed'?R.setup.fixedPartner:R.holes[i].partner; if(p==null) return null;
+  return {A:[0,p],B:[1,2,3].filter(x=>x!==p)};}
+function hcfg(i){const b=R.setup.split&&i>=9; return {type:b?R.setup.hcp2:R.setup.hcp, par:b?R.setup.hcpPar2:R.setup.hcpPar};}
+function hcpOf(i,k){const c=hcfg(i), t=c.type[k]; if(t==='all1') return 1;
+  if(t==='par') return Number(c.par[k][R.holes[i].par])||0;
+  if(t==='hole') return Number(R.holes[i].h[k])||0; return 0;}
+// ハンデを引いてもパーより良くはならない
+function net(i,k){const g=R.holes[i].s[k], par=R.holes[i].par; if(g==null) return null;
+  return g>par?Math.max(par,g-hcpOf(i,k)):g;}
+function usedHcp(i,k){const g=R.holes[i].s[k]; return g==null?0:g-net(i,k);}
+// パーとの差で表示（ハンデを引く前の実際のスコア）
+function scoreBadge(g,par){ if(g==null) return '';
+  const d=g-par; let t;
+  if(g===1) t='ホールインワン'; else if(d<=-3) t='アルバトロス'; else if(d===-2) t='イーグル'; else if(d===-1) t='バーディー';
+  else if(d===0) t='パー'; else if(d===1) t='ボギー'; else if(d===2) t='Dボギー'; else t='+'+d;
+  const cls=d<0?'badge':d===0?'badge par':'badge over';
+  return `<span class="${cls}">${t}</span>`;}
+function isBirdie(i,k){const g=R.holes[i].s[k]; return g!=null && g<=R.holes[i].par-1;}
+function compute(i){
+  const t=teams(i); if(!t) return null;
+  const H=R.holes[i]; if(H.s.some(v=>v==null)) return null;
+  const nA=t.A.map(k=>net(i,k)), nB=t.B.map(k=>net(i,k));
+  const birA=t.A.some(k=>isBirdie(i,k)), birB=t.B.some(k=>isBirdie(i,k));
+  let fa=Math.min(...nA), ba=Math.max(...nA), fb=Math.min(...nB), bb=Math.max(...nB);
+  if(birB){[fa,ba]=[ba,fa];}
+  if(birA){[fb,bb]=[bb,fb];}
+  // 後は「前で勝ったチームが後も勝ったときだけ」+1。前で負けたチームが後で勝っても点は動かない。前が同点なら後で勝ったチームに+1
+  const front=fb-fa, bw=ba<bb?1:(bb<ba?-1:0);
+  const back=front===0?bw:(front>0&&bw>0?1:(front<0&&bw<0?-1:0));
+  let np=0; if(H.np!=null){np=t.A.includes(H.np)?1:-1;}
+  // バーディー賞：バーディー以上の人1人につきそのチームに+1（両チームに出たら相殺）
+  const bir=t.A.filter(k=>isBirdie(i,k)).length-t.B.filter(k=>isBirdie(i,k)).length;
+  const base=front+back+np+bir, mult=Number(H.mult)||1, carry=Number(H.carry)||0;
+  const prod=base*mult, ptsA=prod>0?prod+carry:prod<0?prod-carry:0;
+  return {t,fa,ba,fb,bb,birA,birB,front,back,np,bir,base,mult,carry,ptsA};
+}
+function playerPts(i){const r=compute(i); if(!r) return null;
+  const out=[0,0,0,0]; r.t.A.forEach(k=>out[k]=r.ptsA); r.t.B.forEach(k=>out[k]=-r.ptsA); return out;}
+function totals(){const tot=[0,0,0,0],gro=[0,0,0,0],hc=[0,0,0,0],w=[0,0,0,0],l=[0,0,0,0],d=[0,0,0,0];let played=0;
+  for(let i=0;i<HOLES;i++){const p=playerPts(i); if(p){p.forEach((v,k)=>{tot[k]+=v; if(v>0)w[k]++; else if(v<0)l[k]++; else d[k]++;});played++;}
+    for(let k=0;k<4;k++){const g=R.holes[i].s[k]; if(g!=null){gro[k]+=g;hc[k]+=usedHcp(i,k);}}}
+  return {tot,gro,hc,w,l,d,played};}
+// 前半（1〜9H）・後半（10〜18H）の小計
+function halfTotals(a,b){const tot=[0,0,0,0],gro=[0,0,0,0];let putt=0;
+  for(let i=a;i<=b;i++){const p=playerPts(i); if(p) p.forEach((v,k)=>tot[k]+=v);
+    for(let k=0;k<4;k++){const g=R.holes[i].s[k]; if(g!=null) gro[k]+=g;} if(R.holes[i].putt!=null) putt+=R.holes[i].putt;}
+  return {tot,gro,putt};}
+// スコアカード（実際のスコア・ハンデなし）。—パー △ボギー □Dボギー ○バーディー ◎イーグル以下 +3以上は数字
+function scMark(g,par){if(g==null) return '';const d=g-par;
+  if(d<=-2) return '<span class="mk">◎</span>'; if(d===-1) return '<span class="mk">○</span>'; if(d===0) return '<span class="mk">—</span>';
+  if(d===1) return '<span class="mk">△</span>'; if(d===2) return '<span class="mk sq">□</span>'; return '+'+d;}
+function scoreCards(){const pars=R.holes.map(H=>H.par);
+  return [0,1,2,3].map(k=>cardFor(N(k),R.holes.map(H=>H.s[k]),pars,R.setup.me===k)).join('')
+    +`<div class="note">実際のスコア（ハンデなし）。—パー、△ボギー、□ダブルボギー、○バーディー、◎イーグル。+3はパーより3打多い。</div>`;}
+function withR(r,f){const o=R;R=r;try{return f();}finally{R=o;}}
+const N=k=>R.setup.names[k]||('P'+(k+1));
+const sign=v=>v>0?'+'+v:String(v);
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+/* ---------- match play (自分 vs 相手・1対1) ---------- */
+const isExt=k=>k>=4;
+const MN=k=>isExt(k)?(R.setup.mp.names[k]||'場外'):N(k);
+// 場外の相手がIDの参加者なら、共有のスコアを自動で使う
+const mpSc=(i,k)=>{if(!isExt(k)) return R.holes[i].s[k]??null; const lk=R.setup.mp.lk&&R.setup.mp.lk[k];
+  if(lk&&curEv&&R===L.local) return (curEv.scores[lk]||[])[i]??null; return (R.setup.mp.xs[k]||[])[i]??null;};
+function mpMatches(){const s=R.setup, me=s.me; if(me==null||!s.mp) return [];
+  return s.mp.opps.filter(o=>o!==me&&o<4).concat(s.mp.ext).map(o=>({a:me,b:o}));}
+// ハンデは対戦ごと。who: none=なし / me=自分がもらう / opp=相手がもらう
+// mode: par=パー3・4・5ごと / holes=選んだホールで各1打
+const mhOf=o=>{const h=R.setup.mp.mh[o]; return h&&h.v?{mode:'par',holes:[],...h}:{who:'none',v:{3:0,4:0,5:0},mode:'par',holes:[]};};
+function mpHc(i,k,m){const h=mhOf(m.b); if(!((h.who==='me'&&k===m.a)||(h.who==='opp'&&k===m.b))) return 0;
+  if(h.mode==='holes') return h.holes.includes(i)?1:0;
+  return Number(h.v[R.holes[i].par])||0;}
+function mpNet(i,k,m){const g=mpSc(i,k),par=R.holes[i].par,h=mpHc(i,k,m); if(g==null) return null;
+  if(!R.setup.mp.cap) return g-h; return g>par?Math.max(par,g-h):g;}
+// up>0 なら自分がリード。残りホール数より差が大きくなったら決着、それ以降は数えない
+function mpRun(m,upto){upto=upto==null?HOLES-1:upto; let up=0,dec=null,last=-1; const w=[0,0,0], cells=[];
+  for(let i=0;i<HOLES;i++){
+    if(i>upto){cells.push(null);continue;}
+    const na=mpNet(i,m.a,m), nb=mpNet(i,m.b,m);
+    if(na==null||nb==null){cells.push(null);continue;}
+    const r=na<nb?1:nb<na?-1:0, after=!!dec;
+    if(!after){up+=r; last=i; w[r===1?0:r===-1?1:2]++;}
+    cells.push({r,up,after});
+    const rem=HOLES-1-i; if(!dec&&Math.abs(up)>rem) dec={i,rem};}
+  return {cells,up,dec,last,w};}
+function mpStatus(x){const n=Math.abs(x.up), W=x.up>0;
+  if(x.last<0) return 'まだスコアがありません';
+  if(x.dec) return x.dec.rem>0?`${W?'勝ち':'負け'}（${n}&${x.dec.rem}）`:`${W?'勝ち':'負け'}（${n}${W?'アップ':'ダウン'}）`;
+  const rem=HOLES-1-x.last;
+  if(x.up===0) return rem===0?'引き分け':'オールスクエア（同点）';
+  return `${n}${W?'アップ':'ダウン'}${n===rem?'（ドーミー）':''}`;}
+const mpCol=x=>x.up>0?'var(--teamA)':x.up<0?'var(--teamB)':'var(--fg)';
+const mpTag=k=>(R.setup.me===k?'<span class="metag">自分</span>':'')+(isExt(k)?'<span class="ext">場外</span>':'');
+const mpVs=m=>`<b class="na">${esc(MN(m.a))}</b>${mpTag(m.a)} <span class="vs">vs</span> <b class="nb">${esc(MN(m.b))}</b>${mpTag(m.b)}`;
+function mpSummary(clickable){const ms=mpMatches(); if(!ms.length) return '';
+  return `<div class="mlist">${ms.map(m=>{const x=mpRun(m);
+    return `<div class="mblock"><div class="mhead"><span>${mpVs(m)}</span><span class="note">自分 ${x.w[0]}勝・${esc(MN(m.b))} ${x.w[1]}勝・分け${x.w[2]}</span></div>
+      <div class="mbig" style="color:${mpCol(x)}">${esc(mpStatus(x))}</div>
+      <div class="mgrid">${x.cells.map((c,i)=>`<div class="mc ${!c?'':c.after?'off':c.r>0?'a':c.r<0?'b':''} ${clickable&&i===L.cur?'cur':''}" ${clickable?`data-go="${i}"`:''}>${i+1}<b>${!c?'·':c.after?'–':c.up===0?'AS':Math.abs(c.up)}</b></div>`).join('')}</div></div>`;}).join('')}</div>
+    <div class="note">マスの色＝そのホールに勝った人（<span class="na">青</span>は自分、<span class="nb">赤</span>は相手、白は引き分け）。数字＝その時点で何ホールリードしているか。AS＝同点。薄いマスは決着後。</div>`;}
+function mpText(){return mpMatches().map(m=>`マッチ 自分 vs ${MN(m.b)}：${mpStatus(mpRun(m))}`);}
+
+/* ---------- writing: local or shared ---------- */
+function deepMerge(a,b){for(const k in b){const v=b[k];
+  if(v&&typeof v==='object'&&!Array.isArray(v)&&a[k]&&typeof a[k]==='object'&&!Array.isArray(a[k])) deepMerge(a[k],v); else a[k]=clone(v);} return a;}
+const readOnly=()=>!!(shared&&canWrite===false);
+// apply: change R in place.  patch: the same change in shared-document form
+function mutate(apply,patch){
+  if(readOnly()) return;
+  apply(R);
+  if(shared){pending=pending?deepMerge(pending,patch):clone(patch); flush();}
+  else saveL();
+  render();
+}
+async function flush(){
+  if(flushing||!shared) return; flushing=true;
+  while(pending&&shared){const p=pending; pending=null;
+    try{await db.doc('rounds/'+shared.id).update(p); writeErr='';}
+    catch(e){
+      if(e&&e.code==='unavailable'){await new Promise(r=>setTimeout(r,600+Math.random()*800));
+        try{await db.doc('rounds/'+shared.id).update(p);writeErr='';continue;}catch(e2){e=e2;}}
+      if(e&&e.code==='invalid_argument'){canWrite=false; writeErr='この画面では入力できません（見るだけの権限です）。';}
+      else writeErr='保存できませんでした。電波の良いところでもう一度入力してください。';
+      render();
+    }}
+  flushing=false;
+}
+const holePatch=(i,o)=>({holes:{[i]:o}});
+function toDocHoles(holes){const m={};holes.forEach((h,i)=>{m[i]={par:h.par,s:{...h.s},h:{...h.h},partner:h.partner,np:h.np,carry:h.carry,mult:h.mult};});return m;}
+function fromDoc(d){const dh=d.holes||{};
+  return {setup:fixSetup(clone(d.setup||defaultSetup())),
+    holes:Array.from({length:HOLES},(_,i)=>{const h=dh[i]||{};return {par:h.par||4,s:[0,1,2,3].map(k=>h.s&&h.s[k]!=null?h.s[k]:null),
+      h:[0,1,2,3].map(k=>h.h&&h.h[k]||0),partner:h.partner??null,np:h.np??null,carry:h.carry||0,mult:h.mult||1};})};}
+
+/* ---------- shared rounds ---------- */
+function joinRound(id){
+  if(unsubRound) unsubRound();
+  shared={id,data:null,meta:null,ended:false}; L.roundId=id; saveL(); render();
+  unsubRound=db.doc('rounds/'+id).onSnapshot(snap=>{
+    if(!shared||shared.id!==id) return;
+    if(!snap.exists){
+      if(shared.data){shared.ended=true; endStep='ask';} else {leaveShared(); toast='そのラウンドは見つかりませんでした。';}
+      remoteRender(); return;}
+    const d=clone(snap.data()); if(pending) deepMerge(d,pending);
+    shared.data=fromDoc(d); shared.meta={date:d.date,createdBy:d.createdBy,createdAt:d.createdAt};
+    R=shared.data; remoteRender();
+  },e=>{writeErr='共有データに接続できませんでした。';remoteRender();});
+}
+function leaveShared(){if(unsubRound) unsubRound(); unsubRound=null; shared=null; pending=null; L.roundId=null; R=L.local; saveL();}
+async function createShared(){
+  if(!db) return;
+  const id='r'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  const doc={date:today(),createdAt:Date.now(),createdBy:myId||'',setup:clone(L.local.setup),holes:toDocHoles(L.local.holes)};
+  try{await db.doc('rounds/'+id).set(doc); joinRound(id); toast='共有を始めました。ほかの3人は「今日のラウンド」から参加できます。';}
+  catch(e){toast=e&&e.code==='invalid_argument'?'共有できません（このアプリの編集権限が必要です）。':'共有を始められませんでした。もう一度お試しください。';}
+  render();
+}
+const isHost=()=>!!(shared&&shared.meta&&myId&&shared.meta.createdBy===myId);
+
+/* ---------- history ---------- */
+function allHistory(){const a=[...dbHistory,...L.history.map(h=>({...h,_local:true}))];
+  return a.sort((x,y)=>String(y.date||'').localeCompare(String(x.date||''))||(y.savedAt||0)-(x.savedAt||0));}
+async function saveHistory(){
+  const r=R, t=withR(r,totals);
+  const rec={id:'h'+Date.now().toString(36),date:r.setup.date||(shared&&shared.meta&&shared.meta.date)||today(),savedAt:Date.now(),
+    setup:clone(r.setup),holes:clone(r.holes),tot:t.tot,gro:t.gro};
+  // IDで参加していたら、その時点の順位表と場外マッチのスコアも一緒に残す
+  if(L.link&&curEv){rec.rank=rankRows(curEv); rec.pars=curEv.pars.slice(); rec.pid=L.link.pid; rec.evName=evTitle(curEv);
+    const lk=rec.setup.mp.lk||{}; for(const id in lk){rec.setup.mp.xs[id]=(curEv.scores[lk[id]]||Array(HOLES).fill(null)).slice();} rec.setup.mp.lk={};}
+  if(db&&myId){try{await db.collection('data/users/'+myId).doc(rec.id).set(rec);return true;}catch(e){}}
+  L.history.push(rec); saveL(); return true;
+}
+async function finishRound(keep){
+  if(keep) await saveHistory();
+  const setup=clone(R.setup);
+  if(shared){ if(isHost()&&!shared.ended){try{await db.doc('rounds/'+shared.id).delete();}catch(e){}} leaveShared(); }
+  L.link=null; L.pmode=null; curEv=null;
+  L.local={setup:defaultSetup(),holes:blankHoles()}; R=L.local; L.cur=0; L.view='setup'; endStep=null; saveL(); window.scrollTo(0,0);
+  toast=keep?'記録を保存しました。「履歴」から見られます。':'記録を消しました。';
+  render();
+}
+function histText(rec){return withR(rec,()=>{const t=totals();
+  return [`${rec.date} ${rec.setup.course||''}`.trim(),...[0,1,2,3].map(k=>`${N(k)}：${sign(t.tot[k])}pt（スコア${t.gro[k]||'-'}）`),...mpText()].join('\n');});}
+
+/* ---------- views ---------- */
+function setTab(v){L.view=v;histOpen=null;histDel=null;saveL();render();}
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>setTab(b.dataset.v));
+let deferred=false;
+function remoteRender(){const a=document.activeElement;
+  if(a&&a.tagName==='INPUT'&&document.getElementById('view').contains(a)){deferred=true;return;} render();}
+document.addEventListener('focusout',()=>{if(deferred){deferred=false;setTimeout(render,0);}});
+
+// 画面の書き換え中にもう一度書き換えが起きたら（入力欄から指を離した瞬間など）、終わってからやり直す
+let rendering=false;
+function render(){
+  if(rendering){setTimeout(render,0);return;}
+  rendering=true; try{renderInner();}finally{rendering=false;}
+}
+function renderInner(){
+  syncLinked(); if(L.role==='gallery') L.view='setup';
+  document.querySelector('.tabs').hidden=L.role==='gallery';
+  R=cur();
+  document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.v===L.view));
+  const v=document.getElementById('view');
+  const top=banner();
+  let body;
+  if(shared&&!shared.data) body=`<section class="card"><div class="note">共有ラウンドを読み込み中…</div></section>`;
+  else body=L.view==='setup'?vSetupAll():L.view==='hole'?vHole():L.view==='sum'?vSum():vHist();
+  v.innerHTML=`<div class="wrap${L.view==='setup'?' setupv':''}" style="padding:0">${top}${body}</div>`;
+  bind();
+}
+function banner(){
+  let h='';
+  if(toast) h+=`<div class="toast" role="status">${esc(toast)}</div>`;
+  if(shared) h+=`<div class="live"><span class="dot"></span>共有中・${readOnly()?'見るだけ':'誰が入力しても全員に反映'}${shared.meta&&shared.meta.date!==today()?`（${esc(shared.meta.date)}のラウンド）`:''}</div>`;
+  if(writeErr) h+=`<div class="toast warn" role="alert">${esc(writeErr)}</div>`;
+  return h;
+}
+function opt(name,val,c,title,desc){
+  return `<label class="optitem ${c===val?'on':''}"><input type="radio" name="${name}" value="${val}" ${c===val?'checked':''}><div><b>${title}</b><span>${desc}</span></div></label>`;}
+function roundCard(){
+  if(endStep) return endCard();
+  if(shared){
+    return `<section class="card"><div class="label">ラウンド</div>
+      <div>${isHost()?'あなたが始めた共有ラウンドです。':'共有ラウンドに参加中です。'}ほかの人が入力したスコアもすぐ表示されます。</div>
+      <button class="btn ghost" id="endBtn">ラウンドを終了する</button></section>`;}
+  return `<section class="card"><div class="label">ラウンド</div>
+    <div class="note">${L.link?'スコアは同じ組の人と共有されます。終了すると、このスマホは共有から外れます。':'スコアはこのスマホの中だけに記録されます。ほかの人には見えず、送られることもありません。'}</div>
+    <button class="btn ghost" id="endBtn">ラウンドを終了する</button></section>`;
+}
+function endCard(){
+  const ended=shared&&shared.ended;
+  if(endStep==='discard') return `<section class="card confirm"><div><b>保存せずに消します。</b>このラウンドのスコアは元に戻せません。本当に消しますか？</div>
+    <div class="row"><button class="btn danger" id="discardYes">消す</button><button class="btn ghost" id="endBack">戻る</button></div></section>`;
+  return `<section class="card confirm" style="border-color:var(--accent)">
+    <div><b>${ended?'ホストがラウンドを終了しました。':'ラウンドを終了します。'}</b>このラウンドの記録をどうしますか？</div>
+    <div class="note">${ended?'今画面に出ているスコアを、あなたの履歴に保存できます。'
+      :shared?(isHost()?'あなたはホストなので、終了するとみんなの画面の共有データも消えます。各自が保存した履歴は残ります。':'あなたのスマホだけがラウンドから外れます。ほかの人の画面はそのままです。')
+      :'保存すると「履歴」タブにいつでも見られる形で残ります。'}${L.reg?'':'<br>履歴に残すにはメールアドレスの登録が必要です。「登録して保存する」を押すと登録画面に移ります（入力中のスコアはそのまま残ります）。'}</div>
+    <div class="row">${L.reg?'<button class="btn" id="saveEnd">保存して終了</button>':'<button class="btn" id="regGo">登録して保存する</button>'}<button class="btn danger" id="discardEnd">保存しない</button>${ended?'':`<button class="btn ghost" id="endBack">やめる</button>`}</div></section>`;
+}
+function hcpBlock(s,h){const T=h?s.hcp2:s.hcp, P=h?s.hcpPar2:s.hcpPar;
+  return `<div class="hcpgrid">${[0,1,2,3].map(k=>`<div>${esc(N(k))}</div><div class="chips" data-hcp="${k}" data-half="${h}">${[['none','なし'],['all1','オール1'],['par','パー別'],['hole','ホール毎']].map(([v,l])=>`<button class="chip" data-hv="${v}" aria-pressed="${T[k]===v}">${l}</button>`).join('')}</div>${T[k]==='par'?`<div class="parh">${[3,4,5].map(p=>`<div class="mini-step"><span>パー${p}</span><button data-pk="${k}" data-pp="${p}" data-half="${h}" data-d="-1" aria-label="パー${p}のハンデを減らす">−</button><b>${P[k][p]}</b><button data-pk="${k}" data-pp="${p}" data-half="${h}" data-d="1" aria-label="パー${p}のハンデを増やす">＋</button></div>`).join('')}</div>`:''}`).join('')}</div>`;}
+function vSetup(){
+  const s=R.setup;
+  return `
+  <section class="card">
+    <div class="label">開催日</div>
+    <input type="date" id="rdate" value="${esc(s.date||today())}"${L.link?' readonly':''}>
+    <div class="label">コース名 または コンペ名（履歴の見出しになります）</div>
+    <input type="text" id="course" value="${esc(s.course)}" placeholder="例：○○カントリークラブ"${L.link?' readonly':''}>
+    <div class="label">プレーヤーの名前</div>
+    <div class="names">${[0,1,2,3].map(k=>`<label>${k+1}人目<input type="text" id="name${k}" value="${esc(s.names[k])}"${L.link?' readonly':''}></label>`).join('')}</div>
+    <div class="label">1番ホールのオナー順</div>
+    <div class="ordnow">${(ordPick?ordPick:s.order).map((k,j)=>`<span><b>${j+1}</b>${esc(N(k))}</span>`).join('')}${ordPick?[...Array(4-ordPick.length)].map((_,j)=>`<span class="empty"><b>${ordPick.length+j+1}</b>？</span>`).join(''):''}</div>
+    ${ordPick?`<div class="chips" id="ordSel">${[0,1,2,3].filter(k=>!ordPick.includes(k)).map(k=>`<button class="chip" data-ord="${k}">${esc(N(k))}</button>`).join('')}<button class="chip" id="ordCancel">やめる</button></div><div class="note">打つ順番に名前をタップしてください。</div>`
+      :`<button class="btn ${s.orderSet?'ghost':'ordbtn'}" id="ordStart">${s.orderSet?'オナー順を決め直す':'オナー順を決める'}</button>`}
+    <div class="label">自分はどの人？（パット数を記録する人）</div>
+    ${L.link?`<div class="note">自分：${esc(N(0))}（IDで参加中）</div>`:''}<div class="chips" id="meSel"${L.link?' hidden':''}><button class="chip" data-me="" aria-pressed="${s.me==null}">記録しない</button>${[0,1,2,3].map(k=>`<button class="chip" data-me="${k}" aria-pressed="${s.me===k}">${esc(N(k))}</button>`).join('')}</div>
+    <div class="note">パット数は自分用のメモです。ポイントの計算には使いません。</div>
+  </section>
+  <section class="card">
+    <div class="label">ペアの組み方</div>
+    <div class="opt">
+      ${opt('mode','rotate',s.mode,'ローテーション','1Hは上で決めたオナー順。2H目からは前ホールの実スコア（ハンデ抜き）のオナー順で、1・2 vs 3・4 → 1・3 vs 2・4 → 1・4 vs 2・3 をくり返し')}
+      ${opt('mode','fixed',s.mode,'固定','最後まで同じペア')}
+      ${opt('mode','kankan',s.mode,'カンカン','ホールごとにスコア入力後にペアを決める')}
+    </div>
+    ${s.mode==='fixed'?`<div class="label">${esc(N(0))}さんのパートナー</div><div class="chips" id="fixedP">${[1,2,3].map(k=>`<button class="chip" data-p="${k}" aria-pressed="${s.fixedPartner===k}">${esc(N(k))}</button>`).join('')}</div>`:''}
+  </section>
+  <section class="card">
+    <div class="label">ハンデ（スコアから引く打数）</div>
+    <div class="chips" id="split"><button class="chip" data-s="0" aria-pressed="${!s.split}">18ホール同じ</button><button class="chip" data-s="1" aria-pressed="${!!s.split}">前半・後半で分ける</button></div>
+    ${s.split?`<div class="half">前半（1〜9H）</div>`:''}
+    ${hcpBlock(s,0)}
+    ${s.split?`<div class="half">後半（10〜18H）</div>${hcpBlock(s,1)}`:''}
+    <div class="note">前半・後半で分けると、10H目から後半のハンデに切り替わります（途中で変えても大丈夫です）。オール1：全ホールで1打引く。パー別：パー3・4・5ごとに引く打数を決める。ホール毎：スコア画面でホールごとに＋−で入れる。ハンデを引いてもパーより良くはなりません。</div>
+  </section>
+  ${mpSetupCard(s)}
+  <button class="btn" id="go">スコア入力へ</button>
+  <div id="roundArea">${roundCard()}</div>`;
+}
+function mpSetupCard(s){const mp=s.mp;
+  if(s.me==null) return `<section class="card"><div class="label">マッチプレー（1対1・任意）</div>
+    <div class="note">上の「自分はどの人？」で自分を選ぶと、自分 vs 相手のマッチプレーを設定できます。</div></section>`;
+  const ms=mpMatches(), comp=[0,1,2,3].filter(k=>k!==s.me);
+  const ext=mp.ext.map(id=>{const cnt=R.holes.filter((_,i)=>mpSc(i,id)!=null).length;
+    if(extDel===id) return `<div class="confirm"><div><b>${esc(MN(id))}</b> を外しますか？ 入力したスコアと、この人との対戦も消えます。元に戻せません。</div><div class="row"><button class="btn danger" id="extDelYes">外す</button><button class="btn ghost" id="extDelNo">やめる</button></div></div>`;
+    return `<div class="extrow"><input type="text" id="ename${id}" value="${esc(MN(id))}" aria-label="場外の相手の名前">${mp.lk&&mp.lk[id]?`<span class="chip">自動 ${cnt}/18</span>`:`<button class="chip" data-eopen="${id}" aria-pressed="${extOpen===id}">スコア ${cnt}/18</button>`}<button class="chip" data-edel="${id}">外す</button></div>
+      ${extOpen===id?`<div class="bulk">${R.holes.map((H,i)=>`<div class="mini-step"><span class="hn">${i+1}H<small>P${H.par}</small></span><span class="row" style="gap:4px"><button data-bk="${id}" data-bi="${i}" data-d="-1" aria-label="${i+1}H 1打減らす">−</button><b>${mpSc(i,id)??'–'}</b><button data-bk="${id}" data-bi="${i}" data-d="1" aria-label="${i+1}H 1打増やす">＋</button></span></div>`).join('')}</div><div class="note">−＋の初回タップでパーが入ります。</div>`:''}`;}).join('');
+  const hc=ms.map(m=>{const h=mhOf(m.b), o=m.b;
+    return `<div class="hbox"><div><b>${mpVs(m)}</b></div>
+      <div class="chips" data-mw="${o}">${[['none','なし'],['me','自分がもらう'],['opp',`${esc(MN(o))}がもらう`]].map(([v,l])=>`<button class="chip" data-v="${v}" aria-pressed="${h.who===v}">${l}</button>`).join('')}</div>
+      ${h.who!=='none'?`<div class="chips" data-mm="${o}"><button class="chip" data-m="par" aria-pressed="${h.mode==='par'}">パー別</button><button class="chip" data-m="holes" aria-pressed="${h.mode==='holes'}">ホールを選ぶ</button></div>
+      ${h.mode==='holes'?`<div class="hsel">${R.holes.map((H,i)=>`<button class="hs" data-mhh="${o}" data-hi="${i}" aria-pressed="${h.holes.includes(i)}">${i+1}<small>P${H.par}</small></button>`).join('')}</div>
+        <div class="note"><b>${h.holes.length}打</b>（選んだ${h.holes.length}ホールで、1打ずつ引きます）。タップで選ぶ・もう一度タップで外す。</div>`
+      :`<div class="parh">${[3,4,5].map(p=>`<div class="mini-step"><span>パー${p}</span><button data-mo="${o}" data-hp="${p}" data-d="-1" aria-label="パー${p}のハンデを減らす">−</button><b>${h.v[p]}</b><button data-mo="${o}" data-hp="${p}" data-d="1" aria-label="パー${p}のハンデを増やす">＋</button></div>`).join('')}</div>`}`:''}</div>`;}).join('');
+  return `<section class="card">
+    <div class="label">マッチプレー（自分 vs 相手・任意）</div>
+    <div class="note">ラスベガスで入れたスコアを使って、自分と相手の1対1の勝ち負けも計算します。ハンデはラスベガスとは別です。</div>
+    <div class="label">対戦相手（同伴者）</div>
+    <div class="chips" id="oppSel">${comp.map(k=>`<button class="chip" data-o="${k}" aria-pressed="${mp.opps.includes(k)}">${esc(N(k))}</button>`).join('')}</div>
+    <div class="note">タップした人と対戦します。何人でも選べます。もう一度タップすると対戦から外れます（スコアは消えません）。</div>
+    <div class="label">対戦相手（場外・別の組の人）</div>
+    ${ext||'<div class="note">同じ日・同じコースを別の組で回る人と対戦できます。スコアは上がってからまとめて入れればOKです。</div>'}
+    ${L.link&&curEv?(()=>{const G=curEv.groups[L.link.gid], used=Object.values(mp.lk||{}), cand=curEv.players.filter(p=>!G.members.includes(p.id)&&!used.includes(p.id));
+      return cand.length?`<div class="label">同じイベントの参加者から選ぶ（スコアは自動で入ります）</div><div class="chips">${cand.map(p=>`<button class="chip" data-lkadd="${p.id}">${esc(p.name)}</button>`).join('')}</div>`:'';})():''}
+    <button class="btn ghost" id="extAdd">場外の相手を追加（手入力）</button>
+    ${mp.ext.length?'<div class="note">場外の人は追加すると自動で対戦になります。パーは「スコア」画面で入れたものを使います。</div>':''}
+    ${ms.length?`<div class="label">ハンデ（対戦ごと・パー3・4・5ごとに引く打数）</div><div class="mlist">${hc}</div>
+      ${ms.some(m=>mhOf(m.b).who!=='none')?`<div class="chips" id="mpCap"><button class="chip" data-c="1" aria-pressed="${!!mp.cap}">パーより良くしない</button><button class="chip" data-c="0" aria-pressed="${!mp.cap}">パーより良くなってもよい</button></div>
+      <div class="note">例：「自分がもらう」でパー4に1打、自分のスコア5 → ネット4で相手と比べます。ほかの対戦には影響しません。</div>`:''}
+      <div class="terms"><b>アップ／ダウン</b><span>何ホール勝ち越し／負け越しているか</span><b>オールスクエア</b><span>同点</span><b>ドーミー</b><span>差と残りホール数が同じ</span><b>3&amp;2</b><span>残り2ホールで3アップになり勝ちが決まった</span></div>`:''}
+  </section>`;}
+function mpHoleCard(i){const ms=mpMatches().filter(m=>!isExt(m.b)); if(!ms.length) return '';
+  let anyH=false;
+  const rows=ms.map(m=>{const x=mpRun(m,i), c=x.cells[i];
+    const sv=k=>{const g=mpSc(i,k); if(g==null) return '–'; const n=mpNet(i,k,m); if(n!==g){anyH=true;return `${g}<span class="note">(${n})</span>`;} return String(g);};
+    const hw=!c?'2人のスコアを入れると計算します':c.after?'決着済み（このホールは数えません）':c.r>0?'このホールは自分の勝ち':c.r<0?'このホールは自分の負け':'このホールは引き分け';
+    return `<div class="mrow"><div><div>自分 ${sv(m.a)} <span class="vs">vs</span> ${sv(m.b)} <b class="nb">${esc(MN(m.b))}</b></div><div class="note">${esc(hw)}</div></div><div class="mstat" style="color:${mpCol(x)}">${esc(mpStatus(x))}</div></div>`;}).join('');
+  return `<section class="card"><div class="label">マッチプレー（同伴者・${i+1}Hまで）</div><div class="mlist">${rows}</div>${anyH?'<div class="note">（ ）内はマッチプレーのハンデを引いたスコアです。</div>':''}</section>`;}
+function vHole(){
+  const i=L.cur, H=R.holes[i], t=teams(i), r=compute(i);
+  const team=k=>!t?'none':t.A.includes(k)?'A':'B';
+  const pr=i>0?compute(i-1):null, prevTie=pr&&pr.ptsA===0;
+  const orderLine=t&&t.order?`<div class="pairline order"><span class="nw">打順：${esc(N(t.order[0]))}</span>${t.order.slice(1).map(k=>` <span class="nw">→ ${esc(N(k))}</span>`).join('')}</div>`:'';
+  const pairText=t?`<b style="color:var(--teamA)">${t.A.map(k=>`<span class="nw">${esc(N(k))}</span>`).join('・')}</b> vs <b style="color:var(--teamB)">${t.B.map(k=>`<span class="nw">${esc(N(k))}</span>`).join('・')}</b>`:'ペア未決定';
+  const kan=R.setup.mode==='kankan'?`<section class="card"><div class="label">カンカン：${esc(N(0))}さんのパートナー</div><div class="chips" id="kanP">${[1,2,3].map(k=>`<button class="chip" data-p="${k}" aria-pressed="${H.partner===k}">${esc(N(k))}</button>`).join('')}</div></section>`:'';
+  const players=[0,1,2,3].map(k=>{const hc=hcpOf(i,k);
+    return `<div class="player ${team(k)}">
+      <div class="pname"><span class="tag">${team(k)==='A'?'チームA':team(k)==='B'?'チームB':'　'}</span>
+        <span>${esc(N(k))}${scoreBadge(H.s[k],H.par)}</span>
+        <span class="sub">${hc?`ハンデ${hc} → ネット ${H.s[k]==null?'–':net(i,k)}${H.s[k]!=null&&usedHcp(i,k)<hc?'（パーまで）':''}`:'ハンデなし'}</span></div>
+      <div class="step"><button data-k="${k}" data-d="-1" aria-label="${esc(N(k))} 1打減らす">−</button><span class="val">${H.s[k]??'–'}</span><button data-k="${k}" data-d="1" aria-label="${esc(N(k))} 1打増やす">＋</button></div>
+      ${hcfg(i).type[k]==='hole'?`<div class="hh">このホールのハンデ<div class="mini-step"><button data-hk="${k}" data-d="-1" aria-label="ハンデを減らす">−</button><b>${H.h[k]}</b><button data-hk="${k}" data-d="1" aria-label="ハンデを増やす">＋</button></div></div>`:''}
+    </div>`}).join('');
+  let res;
+  if(!t) res=`<div class="note">パートナーを選ぶと計算します。</div>`;
+  else if(!r) res=`<div class="note">4人のスコアを入れると計算します。</div>`;
+  else{
+    const me=R.setup.me, mine=me!=null, f=mine&&r.t.B.includes(me)?-1:1, sg=x=>sign(f*x);
+    const LA=mine?(f>0?'自分':'相手'):'A', LB=mine?(f<0?'自分':'相手'):'B', my=f*r.ptsA;
+    const who=mine?(my>0?`自分のチーム ${sign(my)}`:my<0?`自分のチーム ${sign(my)}`:'引き分け 0'):(r.ptsA>0?`チームA ${sign(r.ptsA)}`:r.ptsA<0?`チームB ${sign(-r.ptsA)}`:'引き分け 0');
+    const col=mine?(my>0?'var(--teamA)':my<0?'var(--teamB)':'var(--fg)'):(r.ptsA>0?'var(--teamA)':r.ptsA<0?'var(--teamB)':'var(--fg)');
+    const sw=x=>x?'（バーディーで逆転）':'';
+    res=`<div class="big" style="color:${col}">${who}</div>
+    <div class="bd">
+      <span class="k">前</span><span>${LA} ${r.fa}${sw(r.birB)} vs ${LB} ${r.fb}${sw(r.birA)}</span><span class="p">${sg(r.front)}</span>
+      <span class="k">後</span><span>${LA} ${r.ba} vs ${LB} ${r.bb}　${r.front===0?(r.back>0?`前が同点・${LA}が後で勝ち`:r.back<0?`前が同点・${LB}が後で勝ち`:'加点なし'):r.back>0?`${LA}が前後とも勝ち`:r.back<0?`${LB}が前後とも勝ち`:'加点なし'}</span><span class="p">${sg(r.back)}</span>
+      <span class="k">ニアピン</span><span>${H.np==null?'なし':esc(N(H.np))}</span><span class="p">${sg(r.np)}</span>
+      ${r.birA||r.birB?`<span class="k">バーディー賞</span><span>${[...r.t.A,...r.t.B].filter(k=>isBirdie(i,k)).map(N).map(esc).join('・')}</span><span class="p">${sg(r.bir)}</span>`:''}
+      ${r.mult!==1?`<span class="k">倍率</span><span>${sg(r.base)} × ${r.mult}</span><span class="p">${sg(r.base*r.mult)}</span>`:''}
+      ${r.carry?`<span class="k">持ち越し</span><span>${r.ptsA===0?'同点のため移動なし':'勝ったチームへ'}</span><span class="p">${f*r.ptsA>0?'+'+r.carry:f*r.ptsA<0?'−'+r.carry:'0'}</span>`:''}
+    </div><div class="note">${mine?`ポイントは自分（${esc(N(me))}）のチームから見た数字です。`:'ポイントはチームA側から見た数字です。'}</div>`;
+  }
+  return `<section class="card">
+    <div class="holenav"><button class="navbtn" id="prev" ${i===0?'disabled':''} aria-label="前のホール">◀</button>
+      <div class="num">${i+1}<small>H</small></div>
+      <button class="navbtn" id="next" ${i===HOLES-1?'disabled':''} aria-label="次のホール">▶</button></div>
+    ${L.link?`<div class="row" style="justify-content:center"><span class="label">PAR</span><b class="parfix">${H.par}</b><span class="note">（主催者が登録）</span></div>`:`<div class="row" style="justify-content:center"><span class="label">PAR</span><div class="chips" id="par">${[3,4,5].map(p=>`<button class="chip" data-par="${p}" aria-pressed="${H.par===p}">${p}</button>`).join('')}</div></div>`}
+    ${i===0&&!R.setup.orderSet?`<button class="ordwarn" id="ordGo">設定からオナー順を登録してください<small>タップで設定を開きます</small></button>`
+      :`${orderLine}<div class="pairline">${pairText}</div>`}
+  </section>
+  <section class="card" id="players">${players}</section>
+  ${kan}
+  ${R.setup.me!=null?`<section class="card mine"><div class="row" style="justify-content:space-between"><div><div class="label">パット数（${esc(N(R.setup.me))}・自分用）</div><div class="note">計算には入りません</div></div><div class="step" id="putt"><button data-pd="-1" aria-label="パットを1減らす">−</button><span class="val">${H.putt??'–'}</span><button data-pd="1" aria-label="パットを1増やす">＋</button></div></div></section>`:''}
+  <section class="card"><div class="label">ニアピン</div><div class="chips" id="np"><button class="chip" data-np="" aria-pressed="${H.np==null}">なし</button>${[0,1,2,3].map(k=>`<button class="chip" data-np="${k}" aria-pressed="${H.np===k}">${esc(N(k))}</button>`).join('')}</div></section>
+  <section class="card"><div class="extra">
+    <div><div class="label">持ち越しポイント</div><div class="mini-step big"><button data-x="carry" data-d="-1" aria-label="持ち越しを減らす">−</button><b>${Number(H.carry)||0}</b><button data-x="carry" data-d="1" aria-label="持ち越しを増やす">＋</button></div>${prevTie?`<div class="note">前のホールは同点でした</div>`:''}</div>
+    <div><div class="label">倍率</div><div class="mini-step big"><button data-x="mult" data-d="-1" aria-label="倍率を下げる">−</button><b>×${Number(H.mult)||1}</b><button data-x="mult" data-d="1" aria-label="倍率を上げる">＋</button></div></div>
+  </div></section>
+  <section class="result">${res}</section>
+  ${mpHoleCard(i)}`;
+}
+function sumTable(clickable){
+  const rows=[];const t=totals();
+  for(let i=0;i<HOLES;i++){const p=playerPts(i),H=R.holes[i];
+    rows.push(`<tr class="${clickable&&i===L.cur?'cur':''}" ${clickable?`data-go="${i}"`:''}><td>${i+1}H <span class="note">P${H.par}</span>${(Number(H.mult)||1)>1?`<div class="sc hc">×${H.mult}</div>`:''}${(Number(H.carry)||0)>0?`<div class="sc">越${H.carry}</div>`:''}</td>${[0,1,2,3].map(k=>{
+      const g=H.s[k], h=usedHcp(i,k);
+      const pt=p?`<div class="num ${p[k]>0?'pos':p[k]<0?'neg':''}">${sign(p[k])}</div>`:`<div class="num note">·</div>`;
+      return `<td>${pt}<div class="sc">${g==null?'–':g}${h?`<span class="hc">H${h}</span>`:''}${R.setup.me===k&&H.putt!=null?`<span class="pt">パ${H.putt}</span>`:''}</div></td>`;}).join('')}</tr>`);
+    if(i===8||i===17){const a=i===8?0:9, s=halfTotals(a,i);
+      rows.push(`<tr class="sub"><td>${i===8?'前半計':'後半計'}</td>${[0,1,2,3].map(k=>`<td><div class="num ${s.tot[k]>0?'pos':s.tot[k]<0?'neg':''}">${sign(s.tot[k])}</div><div class="sc">${s.gro[k]||'–'}${R.setup.me===k&&s.putt?`<span class="pt">パ${s.putt}</span>`:''}</div></td>`).join('')}</tr>`);}}
+  return `<div class="tablewrap"><table class="${R.setup.me!=null?'mc'+R.setup.me:''}"><thead><tr><th>ホール</th>${[0,1,2,3].map(k=>`<th class="${R.setup.me===k?'meh':''}">${esc(N(k))}${R.setup.me===k?'<br><span class="mytag">自分</span>':''}</th>`).join('')}</tr></thead>
+  <tbody>${rows.join('')}
+  <tr class="total"><td>ポイント</td>${t.tot.map(v=>`<td class="num ${v>0?'pos':v<0?'neg':''}">${sign(v)}</td>`).join('')}</tr>
+  <tr><td>勝敗</td>${[0,1,2,3].map(k=>`<td><div class="wl"><span class="pos">${t.w[k]}勝</span><span class="neg">${t.l[k]}敗</span><span class="note">${t.d[k]}分</span></div></td>`).join('')}</tr>
+  <tr><td>スコア</td>${t.gro.map(v=>`<td class="num">${v||'–'}</td>`).join('')}</tr>
+  <tr><td>ハンデ</td>${t.hc.map(v=>`<td class="num">${v}</td>`).join('')}</tr>
+  <tr><td>ネット</td>${t.gro.map((v,k)=>`<td class="num">${v?v-t.hc[k]:'–'}</td>`).join('')}</tr>
+  ${R.setup.me!=null?(()=>{const ps=R.holes.map(h=>h.putt).filter(v=>v!=null);return `<tr><td>パット</td>${[0,1,2,3].map(k=>`<td class="num">${k===R.setup.me&&ps.length?ps.reduce((a,b)=>a+b,0):'–'}</td>`).join('')}</tr>`;})():''}
+  </tbody></table></div>
+  <div class="note">各マスは上がポイント、下が実際のスコア（H＝実際に引いたハンデ。パーより良くはならないので、設定より少ないことがあります）。×は倍率、越は持ち越し${R.setup.me!=null?'、パは自分のパット数':''}。${clickable?'行をタップするとそのホールを開きます。':''}</div>`;
+}
+function vSum(){return `${L.link&&curEv?`<section class="card"><div class="label">順位表</div>${rankHtml(rankRows(curEv),curEv.pars,L.link.pid)}</section>`:''}<section class="card"><div class="label">合計ポイント${R.setup.course?`　${esc(R.setup.course)}`:''}</div>${sumTable(true)}</section><section class="card"><div class="label">スコアカード</div>${scoreCards()}</section>${mpMatches().length?`<section class="card"><div class="label">マッチプレー</div>${mpSummary(true)}</section>`:''}`;}
+function vHistInner(){
+  const list=allHistory();
+  if(histOpen){const rec=list.find(h=>h.id===histOpen); if(!rec){histOpen=null;return vHist();}
+    return withR({setup:fixSetup(clone(rec.setup)),holes:fixHoles(rec.holes)},()=>`<section class="card">
+      <button class="btn ghost" id="histBack">← 履歴の一覧へ</button>
+      <div class="label">${esc(rec.date)}　${esc(rec.setup.course||'')}</div>
+      ${rec.rank?`<div class="label">順位表${rec.evName?`（${esc(rec.evName)}）`:''}</div>${rankHtml(rec.rank,rec.pars,rec.pid)}`:''}
+      ${sumTable(false)}
+      <div class="label">スコアカード</div>${scoreCards()}
+      ${mpMatches().length?`<div class="label">マッチプレー</div>${mpSummary(false)}`:''}
+      <div class="row"><button class="btn ghost" id="copyBtn">結果を文字でコピー</button></div>
+      <textarea id="copyText" readonly hidden>${esc(histText(rec))}</textarea>
+      ${histDel===rec.id?`<div class="confirm"><div>この記録を削除します。元に戻せません。本当に削除しますか？</div><div class="row"><button class="btn danger" id="delYes">削除する</button><button class="btn ghost" id="delNo">やめる</button></div></div>`
+        :`<button class="btn danger" id="delBtn">この記録を削除</button>`}
+    </section>`);}
+  if(!list.length) return `<section class="card"><div class="label">履歴</div><div class="note">保存したラウンドはまだありません。ラウンドが終わったら「設定」の「ラウンドを終了する」から保存すると、ここに並びます。</div></section>`;
+  return `<section class="card"><div class="label">履歴（保存したラウンド）</div><div class="opt">${list.map(h=>{
+    const names=(h.setup&&h.setup.names)||[];
+    return `<button class="joinitem" data-hist="${esc(h.id)}"><b>${esc(h.date)}　${esc(h.setup.course||'')}</b><span>${names.map((n,k)=>`${esc(n)} ${sign((h.tot||[])[k]||0)}`).join('　')}</span></button>`;}).join('')}</div>
+    <div class="note">履歴は登録したアカウントに保存されます（試し用の今は、このスマホの中に保存しています）。</div></section>`;
+}
+
+
+/* ========== 共有（試し用：このスマホの中だけで動く仮の仕組み。引っ越し後はFirebaseに差し替える） ========== */
+const SKEY='vegas-shared-demo-v1', MAXP=40;
+const evStart=ev=>new Date(ev.date+'T00:00:00').getTime();
+const evEnd=ev=>evStart(ev)+48*3600*1000;   // 開催日の0時から48時間で消える
+const Shared={
+  _all(){try{return JSON.parse(localStorage.getItem(SKEY))||{};}catch(e){return {};}},
+  _save(a){try{localStorage.setItem(SKEY,JSON.stringify(a));}catch(e){}},
+  get(code){const a=this._all(), ev=a[code]; if(!ev) return null; if(Date.now()>evEnd(ev)){delete a[code]; this._save(a); return null;} return ev;},
+  put(ev){const a=this._all(); a[ev.code]=ev; this._save(a);},
+  create(d){const a=this._all(); let code; do{code=String(1000+Math.floor(Math.random()*9000));}while(a[code]);
+    const ev={code,date:d.date,name:d.name,course:d.course,pars:d.pars.slice(),players:d.players.map((n,j)=>({id:'p'+(j+1),name:n})),groups:{},scores:{},createdAt:Date.now()};
+    a[code]=ev; this._save(a); return ev;},
+  setScore(code,pid,i,v){const ev=this.get(code); if(!ev) return; (ev.scores[pid]||(ev.scores[pid]=Array(HOLES).fill(null)))[i]=v; this.put(ev);}
+};
+const pName=(ev,pid)=>{const p=ev.players.find(x=>x.id===pid); return p?p.name:'?';};
+function groupOf(ev,pid){for(const g in ev.groups) if(ev.groups[g].members.includes(pid)) return g; return null;}
+function removeFromGroup(ev,pid){const g=groupOf(ev,pid); if(!g) return; const G=ev.groups[g]; G.members=G.members.filter(x=>x!==pid); if(!G.members.length) delete ev.groups[g];}
+const fmtD=d=>{const p=String(d||'').split('-'); return p.length===3?`${+p[1]}月${+p[2]}日`:'';};
+const shareUrl=code=>`https://hmsr16.github.io/golf#${code}`;
+const evTitle=ev=>ev.name||ev.course||'コンペ';
+
+let curEv=null, J={step:'code',code:'',msg:'',early:false,me:null,picks:[]}, galMsg='', galEarly=false, orgMsg='', grmAsk=null, ormAsk=null, rankOpen=null, regMsg='', regDel=false;
+
+// 共有中の組の名前・パー・スコアを、このスマホの表示に反映
+function syncLinked(){curEv=null; const lk=L.link; if(!lk) return;
+  const ev=Shared.get(lk.code);
+  if(!ev){toast='共有の期限が切れたため、共有から外れました。このスマホのスコアは残っています。'; L.link=null; saveL(); return;}
+  const G=ev.groups[lk.gid];
+  if(!G||!G.members.includes(lk.pid)){toast='組から外れたため、共有をやめました。このスマホのスコアは残っています。'; L.link=null; saveL(); return;}
+  curEv=ev; const R0=L.local;
+  const mem=[lk.pid,...G.members.filter(x=>x!==lk.pid)]; lk.members=mem;
+  for(let k=0;k<4;k++){const pid=mem[k]; R0.setup.names[k]=pid?pName(ev,pid):'（空き）';}
+  R0.holes.forEach((H,i)=>{H.par=ev.pars[i]; for(let k=0;k<4;k++){const pid=mem[k]; H.s[k]=pid&&ev.scores[pid]?(ev.scores[pid][i]??null):null;}});
+  R0.setup.me=0; R0.setup.date=ev.date; R0.setup.course=evTitle(ev);
+}
+function linkTo(ev,gid,pid){L.local={setup:defaultSetup(),holes:blankHoles()}; L.link={code:ev.code,pid,gid}; L.cur=0; L.pmode='code';
+  J={step:'code',code:'',msg:'',early:false,me:null,picks:[]}; saveL(); toast=`${gid}組で参加しました。スコアは同じ組の人と共有されます。`; render();}
+const localHasScores=()=>L.local.holes.some(H=>H.s.some(v=>v!=null));
+
+/* ---------- 順位表とスコアカード ---------- */
+function cardFor(name,sc,pars,isMe){let gross=0,parSum=0,n=0;
+  sc.forEach((g,i)=>{if(g!=null){gross+=g;parSum+=pars[i];n++;}});
+  const half=a=>{const idx=[...Array(9)].map((_,j)=>a+j), cnt=idx.filter(i=>sc[i]!=null).length, sum=idx.reduce((t,i)=>t+(sc[i]??0),0);
+    return `<div class="scg">${idx.map(i=>`<div class="sh">${i+1}</div>`).join('')}<div class="sh">${a?'IN':'OUT'}</div>
+      ${idx.map(i=>`<div class="sp">${pars[i]}</div>`).join('')}<div class="sp">${idx.reduce((t,i)=>t+pars[i],0)}</div>
+      ${idx.map(i=>`<div class="sv">${scMark(sc[i]??null,pars[i])}</div>`).join('')}<div class="sv tot">${cnt?sum:''}</div></div>`;};
+  const d=gross-parSum;
+  return `<div class="scard${isMe?' me':''}"><div class="schead"><b>${esc(name)}</b>${isMe?'<span class="mytag">自分</span>':''}
+    <span class="sctot">${n?`${d>0?'+'+d:d===0?'±0':d}<small>（${gross}）</small>`:'–'}</span><span class="note">${n}H</span></div>${half(0)}${half(9)}</div>`;}
+function rankRows(ev){return ev.players.map(p=>{const sc=(ev.scores[p.id]||Array(HOLES).fill(null)).slice(); let g=0,d=0,n=0;
+    sc.forEach((v,i)=>{if(v!=null){g+=v;d+=v-ev.pars[i];n++;}}); return {id:p.id,name:p.name,g,d,n,sc};})
+  .filter(r=>r.n>0).sort((a,b)=>a.d-b.d||b.n-a.n);}
+function rankHtml(rows,pars,meId){if(!rows.length) return '<div class="note">まだスコアが入っていません。</div>';
+  let prev=null,rk=0;
+  return `<div class="rank"><div class="rhead"><span>順位</span><span>プレーヤー</span><span>スコア</span><span>ホール</span></div>${rows.map((r,j)=>{if(prev===null||r.d!==prev) rk=j+1; prev=r.d; const open=rankOpen===r.id;
+    return `<button class="rrow${open?' open':''}${r.id===meId?' mine':''}" data-rk="${esc(r.id)}"><span class="rn">${rk}</span><span class="rname">${esc(r.name)}</span><span class="rsc">${r.d>0?'+'+r.d:r.d===0?'±0':r.d}<small>(${r.g})</small></span><span class="rh">${r.n}</span></button>${open?`<div class="ropen">${cardFor(r.name,r.sc,pars,r.id===meId)}</div>`:''}`;}).join('')}</div>
+    <div class="note">実際のスコア（ハンデなし）の少ない順。名前を押すとスコアカードが出ます。</div>`;}
+
+/* ---------- 役割の切り替え ---------- */
+function roleCard(){return `<section class="card"><div class="roles">${[['organizer','主催者'],['player','プレーヤー'],['gallery','ギャラリー']].map(([v,l])=>`<button class="rolebtn" data-role="${v}" aria-pressed="${L.role===v}">${l}</button>`).join('')}</div>
+  <div class="note demo">試し用：IDでの共有は、今はこのスマホの中だけで動きます（引っ越し後に本物の共有になります）。</div></section>`;}
+function evHead(ev){return `<div class="evhead"><b>${esc(evTitle(ev))}</b><span class="note">${fmtD(ev.date)}　${esc(ev.course||'')}　ID ${ev.code}</span></div>`;}
+
+/* ---------- 主催者 ---------- */
+function orgDraft(){if(!L.org) L.org={date:today(),name:'',course:'',pars:Array(HOLES).fill(4),names:''}; return L.org;}
+function orgNames(){return orgDraft().names.split('\n').map(s=>s.trim()).filter(Boolean);}
+function evCard(ev){const inG=new Set(Object.values(ev.groups).flatMap(G=>G.members)), rest=ev.players.filter(p=>!inG.has(p.id));
+  const gs=Object.keys(ev.groups).sort((a,b)=>a-b);
+  return `<section class="card issued">${evHead(ev)}
+    <div class="bigcode">${ev.code}</div>
+    <div class="urlrow"><span class="url">${esc(shareUrl(ev.code))}</span><button class="chip" data-copy="${esc(shareUrl(ev.code))}">URLをコピー</button></div>
+    <div class="note">共有できるのは ${fmtD(ev.date)} 0時から48時間です。参加者 ${ev.players.length}人。</div>
+    <div class="label">組分けの状況</div>
+    ${gs.length?gs.map(g=>{const G=ev.groups[g]; return `<div class="grow"><b>${g}組</b><span class="note">（${esc(pName(ev,G.by))}が選択）</span><div class="chips">${G.members.map(x=>`<button class="chip" data-orm="${ev.code}|${x}">${esc(pName(ev,x))} ✕</button>`).join('')}</div></div>`;}).join(''):'<div class="note">まだ組はできていません。</div>'}
+    ${ormAsk&&ormAsk.startsWith(ev.code+'|')?(()=>{const pid=ormAsk.split('|')[1]; return `<div class="confirm"><div><b>${esc(pName(ev,pid))}</b>さんを組から外しますか？ 入力済みのスコアは消えません。</div><div class="row"><button class="btn danger" id="ormYes">外す</button><button class="btn ghost" id="ormNo">やめる</button></div></div>`;})():''}
+    ${rest.length?`<div class="note">まだ組に入っていない人：${rest.map(p=>esc(p.name)).join('・')}</div>`:''}
+  </section>`;}
+function vOrg(){const o=orgDraft(), names=orgNames(), mine=(L.myEvents||[]).map(c=>Shared.get(c)).filter(Boolean);
+  return `${mine.map(evCard).join('')}
+  <section class="card"><div class="label">新しいコンペを登録</div>
+    <div class="label">開催日</div><input type="date" id="oDate" value="${esc(o.date)}">
+    <div class="label">コンペ名称（任意）</div><input type="text" id="oName" value="${esc(o.name)}" placeholder="例：○○杯">
+    <div class="label">ゴルフ場名</div><input type="text" id="oCourse" value="${esc(o.course)}" placeholder="例：○○カントリークラブ">
+    <div class="label">各ホールのパー（タップで 4→5→3 と変わります）</div>
+    ${[0,9].map(a=>`<div class="pgrid">${[...Array(9)].map((_,j)=>`<button class="pc" data-op="${a+j}">${a+j+1}<b>${o.pars[a+j]}</b></button>`).join('')}<div class="pc tot">${a?'IN':'OUT'}<b>${o.pars.slice(a,a+9).reduce((x,y)=>x+y,0)}</b></div></div>`).join('')}
+    <div class="label">参加者の名前（1行に1人・最大40人）</div>
+    <textarea id="oNames" rows="8" placeholder="山田太郎&#10;鈴木花子">${esc(o.names)}</textarea>
+    <div id="oCount" class="note${names.length>MAXP?' warnTxt':''}">${names.length}人${names.length>MAXP?'（40人までです）':''}</div>
+    ${orgMsg?`<div class="toast warn">${esc(orgMsg)}</div>`:''}
+    <button class="btn" id="oIssue">IDを発行する</button>
+    <div class="note">共有データは開催日の0時から48時間で自動的に消えます。プレーヤーとギャラリーは開催日から参加できます。</div>
+  </section>`;}
+
+/* ---------- プレーヤー（IDで参加） ---------- */
+function vJoin(){
+  if(J.step==='code') return `<section class="card"><div class="label">IDで参加</div>
+    <div class="coderow"><input type="text" id="joinCode" inputmode="numeric" maxlength="4" placeholder="イベントID" value="${esc(J.code)}"><button class="btn" id="joinGo">参加</button></div>
+    ${J.msg?`<div class="toast warn">${esc(J.msg)}</div>`:''}${J.early?`<button class="btn ghost" id="joinForce">試し用：今すぐ参加する</button>`:''}
+    ${localHasScores()?'<div class="note">参加すると、今このスマホで入力中のスコアは新しいラウンドに切り替わります。</div>':''}
+    <div class="or">または</div><button class="btn ghost" id="soloGo">単体で始める（共有しない）</button></section>`;
+  const ev=Shared.get(J.code); if(!ev){J={step:'code',code:'',msg:'IDが見つかりません。期限が切れた可能性があります。',early:false,me:null,picks:[]}; return vJoin();}
+  const gl=p=>{const g=groupOf(ev,p.id); return g?`<small>${g}組（${esc(pName(ev,ev.groups[g].by))}が選択）</small>`:'';};
+  if(J.step==='name') return `<section class="card">${evHead(ev)}<div class="label">自分の名前を選んでください</div>
+    <div class="plist">${ev.players.map(p=>`<button class="pbtn" data-jme="${p.id}">${esc(p.name)}${gl(p)}</button>`).join('')}</div>
+    <button class="btn ghost" id="joinBack">戻る</button></section>`;
+  if(J.step==='confirm'){const g=groupOf(ev,J.me); if(!g){J.step='pick';return vJoin();} const G=ev.groups[g];
+    return `<section class="card">${evHead(ev)}<div class="ask"><b>${esc(pName(ev,J.me))}</b>さんは<b>${g}組</b>（${esc(pName(ev,G.by))}が選択）です。この組で参加しますか？</div>
+      <div class="note">${g}組：${G.members.map(x=>esc(pName(ev,x))).join('・')}</div>
+      <div class="row"><button class="btn" id="jJoin">参加する</button><button class="btn danger" id="jWrong">違う組です</button></div>
+      <button class="btn ghost" id="joinBack">戻る</button></section>`;}
+  return `<section class="card">${evHead(ev)}<div class="label">同じ組の人を選んでください（最大3人）</div>
+    <div class="plist">${ev.players.filter(p=>p.id!==J.me).map(p=>{const g=groupOf(ev,p.id), on=J.picks.includes(p.id);
+      return `<button class="pbtn${on?' on':''}" data-jpk="${p.id}" ${g?'disabled':''} aria-pressed="${on}">${esc(p.name)}${gl(p)}</button>`;}).join('')}</div>
+    <div class="note">この組：${[J.me,...J.picks].map(x=>esc(pName(ev,x))).join('・')}</div>
+    <button class="btn" id="jStart">この組で始める</button><button class="btn ghost" id="joinBack">戻る</button></section>`;}
+function vLinkedCard(){const ev=curEv, lk=L.link, G=ev.groups[lk.gid];
+  return `<section class="card linked">${evHead(ev)}
+    <div><b>${lk.gid}組</b>：${G.members.map(x=>esc(pName(ev,x))).join('・')}<span class="note">（${esc(pName(ev,G.by))}が選択）</span></div>
+    ${G.by===lk.pid&&G.members.length>1?`<div class="chips">${G.members.filter(x=>x!==lk.pid).map(x=>`<button class="chip" data-grm="${x}">${esc(pName(ev,x))}を外す</button>`).join('')}</div>`:''}
+    ${grmAsk?`<div class="confirm"><div>${grmAsk==='self'?'この組から抜けますか？ このスマホのスコアは残りますが、共有はやめます。':`<b>${esc(pName(ev,grmAsk))}</b>さんを${lk.gid}組から外しますか？ 入力済みのスコアは消えません。`}</div><div class="row"><button class="btn danger" id="grmYes">${grmAsk==='self'?'抜ける':'外す'}</button><button class="btn ghost" id="grmNo">やめる</button></div></div>`
+      :`<button class="btn ghost" id="leaveGrp">この組から抜ける</button>`}
+  </section>`;}
+
+/* ---------- ギャラリー ---------- */
+function vGallery(){const g=L.gal||{}, ev=g.code&&g.ok?Shared.get(g.code):null;
+  if(!ev) return `<section class="card"><div class="label">ギャラリー</div><div class="note">IDを入れると、コンペの順位表とスコアカードを見られます。</div>
+    <div class="coderow"><input type="text" id="galCode" inputmode="numeric" maxlength="4" placeholder="イベントID" value="${esc(g.code||'')}"><button class="btn" id="galGo">見る</button></div>
+    ${galMsg?`<div class="toast warn">${esc(galMsg)}</div>`:''}${galEarly?`<button class="btn ghost" id="galForce">試し用：今すぐ見る</button>`:''}</section>`;
+  return `<section class="card">${evHead(ev)}${rankHtml(rankRows(ev),ev.pars,null)}<button class="btn ghost" id="galOut">IDを入れ直す</button></section>`;}
+
+/* ---------- 登録（履歴を残す人だけ） ---------- */
+function regCard(){
+  if(!L.reg) return `<section class="card"><div class="regmsg">履歴を保存するにはメールアドレスの登録が必要です</div>
+    <input type="email" id="regMail" placeholder="メールアドレス" autocomplete="email">
+    <button class="btn" id="regSend">確認メールを送る</button>
+    <div class="or">または</div><button class="btn ghost" id="regGoogle">Googleでログイン</button>
+    ${regMsg?`<div class="toast warn">${esc(regMsg)}</div>`:''}
+    <div class="note">アドレスは履歴の保存にだけ使います。試し用のため、今は確認メールは送られず、すぐに登録されます。</div></section>`;
+  return `<section class="card"><div class="row" style="justify-content:space-between"><div><div class="label">登録中</div><div>${esc(L.reg.label)}</div></div></div>
+    ${regDel?`<div class="confirm"><div>登録をやめると、保存した履歴もすべて削除されます。元に戻せません。本当にやめますか？</div><div class="row"><button class="btn danger" id="regDelYes">やめて削除する</button><button class="btn ghost" id="regDelNo">戻る</button></div></div>`
+      :`<button class="btn danger" id="regDel">登録をやめる（履歴も削除）</button>`}</section>`;}
+
+function bindShared(){const $=id=>document.getElementById(id);
+  document.querySelectorAll('[data-role]').forEach(b=>b.onclick=()=>{L.role=b.dataset.role; if(L.role==='gallery') L.view='setup'; saveL(); render();});
+  // 主催者
+  const o=L.org;
+  if($('oDate')){$('oDate').onchange=e=>{o.date=e.target.value;saveL();};
+    $('oName').oninput=e=>{o.name=e.target.value;saveL();}; $('oCourse').oninput=e=>{o.course=e.target.value;saveL();};
+    $('oNames').oninput=e=>{o.names=e.target.value;saveL(); const n=orgNames().length, c=$('oCount'); if(c){c.textContent=n+'人'+(n>MAXP?'（40人までです）':''); c.className='note'+(n>MAXP?' warnTxt':'');}};
+    document.querySelectorAll('[data-op]').forEach(b=>b.onclick=()=>{const i=+b.dataset.op; o.pars[i]=o.pars[i]===4?5:o.pars[i]===5?3:4; saveL(); render();});
+    $('oIssue').onclick=()=>{const names=orgNames(); orgMsg='';
+      if(!o.date) orgMsg='開催日を入れてください。'; else if(!o.course.trim()) orgMsg='ゴルフ場名を入れてください。';
+      else if(names.length<2) orgMsg='参加者を2人以上入れてください。'; else if(names.length>MAXP) orgMsg='参加者は40人までです。';
+      else if(new Set(names).size!==names.length) orgMsg='同じ名前が2回入っています。区別できるように名前を変えてください。';
+      if(orgMsg){render();return;}
+      const ev=Shared.create({date:o.date,name:o.name.trim(),course:o.course.trim(),pars:o.pars,players:names});
+      L.myEvents=(L.myEvents||[]).concat([ev.code]); L.org=null; saveL(); toast=`ID「${ev.code}」を発行しました。`; render(); window.scrollTo(0,0);};}
+  document.querySelectorAll('[data-orm]').forEach(b=>b.onclick=()=>{ormAsk=b.dataset.orm; render();});
+  if($('ormNo')) $('ormNo').onclick=()=>{ormAsk=null;render();};
+  if($('ormYes')) $('ormYes').onclick=()=>{const [code,pid]=ormAsk.split('|'), ev=Shared.get(code); if(ev){removeFromGroup(ev,pid); Shared.put(ev);} ormAsk=null; render();};
+  document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{const t=b.dataset.copy;
+    try{navigator.clipboard.writeText(t).then(()=>{toast='URLをコピーしました。LINEなどに貼り付けられます。';render();},()=>{toast='コピーできませんでした。URLを長押しして選んでください。';render();});}catch(e){toast='コピーできませんでした。URLを長押しして選んでください。';render();}});
+  // プレーヤー
+  if($('toJoin')) $('toJoin').onclick=()=>{L.pmode='code'; saveL(); render();};
+  if($('soloGo')) $('soloGo').onclick=()=>{L.pmode='solo'; saveL(); render();};
+  if($('joinGo')) $('joinGo').onclick=()=>{const c=($('joinCode').value||'').replace(/\D/g,''); J.code=c; J.msg=''; J.early=false;
+    const ev=Shared.get(c); if(!ev){J.msg='IDが見つかりません。数字を確かめてください。'; render(); return;}
+    if(Date.now()<evStart(ev)){J.msg=`このコンペは${fmtD(ev.date)}から参加できます。`; J.early=true; render(); return;}
+    J.step='name'; render();};
+  if($('joinForce')) $('joinForce').onclick=()=>{J.msg='';J.early=false;J.step='name';render();};
+  if($('joinBack')) $('joinBack').onclick=()=>{J.step=J.step==='name'?'code':'name'; J.picks=[]; render();};
+  document.querySelectorAll('[data-jme]').forEach(b=>b.onclick=()=>{const ev=Shared.get(J.code); J.me=b.dataset.jme; J.picks=[]; J.step=ev&&groupOf(ev,J.me)?'confirm':'pick'; render();});
+  if($('jJoin')) $('jJoin').onclick=()=>{const ev=Shared.get(J.code), g=ev&&groupOf(ev,J.me); if(g) linkTo(ev,g,J.me);};
+  if($('jWrong')) $('jWrong').onclick=()=>{const ev=Shared.get(J.code); if(ev){removeFromGroup(ev,J.me); Shared.put(ev);} J.step='pick'; J.picks=[]; render();};
+  document.querySelectorAll('[data-jpk]').forEach(b=>b.onclick=()=>{const p=b.dataset.jpk;
+    if(J.picks.includes(p)) J.picks=J.picks.filter(x=>x!==p); else if(J.picks.length<3) J.picks.push(p); else toast='同じ組に選べるのは3人までです。'; render();});
+  if($('jStart')) $('jStart').onclick=()=>{const ev=Shared.get(J.code); if(!ev) return;
+    if(groupOf(ev,J.me)){J.step='confirm';render();return;}
+    const taken=J.picks.filter(p=>groupOf(ev,p)); if(taken.length){toast=`${taken.map(p=>pName(ev,p)).join('・')}さんは、ほかの組に選ばれました。選び直してください。`; J.picks=J.picks.filter(p=>!taken.includes(p)); render(); return;}
+    const gid=String(Math.max(0,...Object.keys(ev.groups).map(Number))+1); ev.groups[gid]={by:J.me,members:[J.me,...J.picks]}; Shared.put(ev); linkTo(ev,gid,J.me);};
+  document.querySelectorAll('[data-grm]').forEach(b=>b.onclick=()=>{grmAsk=b.dataset.grm; render();});
+  if($('leaveGrp')) $('leaveGrp').onclick=()=>{grmAsk='self'; render();};
+  if($('grmNo')) $('grmNo').onclick=()=>{grmAsk=null;render();};
+  if($('grmYes')) $('grmYes').onclick=()=>{const ev=Shared.get(L.link.code);
+    if(ev){removeFromGroup(ev,grmAsk==='self'?L.link.pid:grmAsk); Shared.put(ev);}
+    if(grmAsk==='self'){L.link=null; L.pmode='code'; saveL(); toast='組から抜けました。';} grmAsk=null; render();};
+  // ギャラリー
+  if($('galGo')) $('galGo').onclick=()=>{const c=($('galCode').value||'').replace(/\D/g,''); galMsg=''; galEarly=false; L.gal={code:c,ok:false};
+    const ev=Shared.get(c); if(!ev) galMsg='IDが見つかりません。数字を確かめてください。';
+    else if(Date.now()<evStart(ev)){galMsg=`このコンペは${fmtD(ev.date)}から見られます。`; galEarly=true;} else L.gal.ok=true;
+    saveL(); render();};
+  if($('galForce')) $('galForce').onclick=()=>{L.gal.ok=true; galMsg=''; galEarly=false; saveL(); render();};
+  if($('galOut')) $('galOut').onclick=()=>{L.gal={code:'',ok:false}; rankOpen=null; saveL(); render();};
+  document.querySelectorAll('[data-rk]').forEach(b=>b.onclick=()=>{rankOpen=rankOpen===b.dataset.rk?null:b.dataset.rk; render();});
+  // 登録
+  if($('regSend')) $('regSend').onclick=()=>{const m=($('regMail').value||'').trim();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(m)){regMsg='メールアドレスを確かめてください。'; render(); return;}
+    L.reg={method:'email',label:m}; regMsg=''; saveL(); toast='登録しました。これから保存するラウンドは履歴に残ります。'; render();};
+  if($('regGoogle')) $('regGoogle').onclick=()=>{L.reg={method:'google',label:'Googleアカウント（試し用）'}; regMsg=''; saveL(); toast='登録しました。これから保存するラウンドは履歴に残ります。'; render();};
+  if($('regDel')) $('regDel').onclick=()=>{regDel=true;render();};
+  if($('regDelNo')) $('regDelNo').onclick=()=>{regDel=false;render();};
+  if($('regDelYes')) $('regDelYes').onclick=()=>{L.reg=null; L.history=[]; regDel=false; histOpen=null; saveL(); toast='登録をやめて、履歴を削除しました。'; render();};
+  if($('regGo')) $('regGo').onclick=()=>{endStep=null; setTab('hist');};
+}
+
+function vSetupAll(){
+  if(L.role==='organizer') return roleCard()+vOrg();
+  if(L.role==='gallery') return roleCard()+vGallery();
+  if(!L.link&&L.pmode!=='solo') return roleCard()+vJoin();
+  return roleCard()+(L.link&&curEv?vLinkedCard():`<section class="card"><button class="btn ghost" id="toJoin">IDで参加する</button></section>`)+vSetup();}
+function vHist(){if(!L.reg) return regCard(); return vHistInner()+(histOpen?'':regCard());}
+
+function mpSet(f){const mp=clone(R.setup.mp); f(mp); mutate(r=>r.setup.mp=clone(mp),{setup:{mp}});}
+function bindMp(){const $=id=>document.getElementById(id);
+  if($('oppSel')) $('oppSel').onclick=e=>{const b=e.target.closest('[data-o]'); if(!b) return; const k=+b.dataset.o;
+    mpSet(mp=>mp.opps=mp.opps.includes(k)?mp.opps.filter(x=>x!==k):mp.opps.concat([k]).sort());};
+  if($('extAdd')) $('extAdd').onclick=()=>mpSet(mp=>{const id=Math.max(3,...mp.ext,...Object.keys(mp.names).map(Number))+1;
+    mp.ext.push(id); mp.names[id]='場外'+mp.ext.length; mp.xs[id]=Array(HOLES).fill(null); extOpen=null;});
+  R.setup.mp.ext.forEach(id=>{const el=$('ename'+id); if(el) el.onchange=e=>mpSet(mp=>mp.names[id]=e.target.value);});
+  document.querySelectorAll('[data-eopen]').forEach(b=>b.onclick=()=>{const id=+b.dataset.eopen; extOpen=extOpen===id?null:id; render();});
+  document.querySelectorAll('[data-edel]').forEach(b=>b.onclick=()=>{extDel=+b.dataset.edel; render();});
+  if($('extDelNo')) $('extDelNo').onclick=()=>{extDel=null;render();};
+  if($('extDelYes')) $('extDelYes').onclick=()=>{const id=extDel; extDel=null; if(extOpen===id) extOpen=null;
+    mpSet(mp=>{mp.ext=mp.ext.filter(x=>x!==id); delete mp.names[id]; delete mp.xs[id]; delete mp.mh[id]; if(mp.lk) delete mp.lk[id];});};
+  document.querySelectorAll('[data-bk]').forEach(b=>b.onclick=()=>{const k=+b.dataset.bk, i=+b.dataset.bi, g=mpSc(i,k), par=R.holes[i].par;
+    mpSet(mp=>{const a=mp.xs[k]||(mp.xs[k]=Array(HOLES).fill(null)); a[i]=g==null?par:Math.max(1,g+(+b.dataset.d));});});
+  document.querySelectorAll('[data-mw]').forEach(g=>g.onclick=e=>{const b=e.target.closest('[data-v]'); if(!b) return; const o=g.dataset.mw;
+    mpSet(mp=>{const h=mp.mh[o]&&mp.mh[o].v?mp.mh[o]:(mp.mh[o]={who:'none',v:{3:0,4:0,5:0}}); h.who=b.dataset.v;});});
+  document.querySelectorAll('[data-mo]').forEach(b=>b.onclick=()=>mpSet(mp=>{const h=mp.mh[b.dataset.mo]; if(h) h.v[b.dataset.hp]=Math.max(0,(Number(h.v[b.dataset.hp])||0)+(+b.dataset.d));}));
+  document.querySelectorAll('[data-mm]').forEach(g=>g.onclick=e=>{const b=e.target.closest('[data-m]'); if(!b) return; const o=g.dataset.mm;
+    mpSet(mp=>{const h=mp.mh[o]; if(h){h.mode=b.dataset.m; if(!h.holes) h.holes=[];}});});
+  document.querySelectorAll('[data-mhh]').forEach(b=>b.onclick=()=>{const o=b.dataset.mhh, i=+b.dataset.hi;
+    mpSet(mp=>{const h=mp.mh[o]; if(!h) return; const hs=h.holes||[]; h.holes=hs.includes(i)?hs.filter(x=>x!==i):hs.concat([i]).sort((a,b)=>a-b);});});
+  document.querySelectorAll('[data-lkadd]').forEach(b=>b.onclick=()=>mpSet(mp=>{const pid=b.dataset.lkadd, id=Math.max(3,...mp.ext,...Object.keys(mp.names).map(Number))+1;
+    mp.ext.push(id); mp.names[id]=pName(curEv,pid); mp.xs[id]=Array(HOLES).fill(null); (mp.lk||(mp.lk={}))[id]=pid;}));
+  if($('mpCap')) $('mpCap').onclick=e=>{const b=e.target.closest('[data-c]'); if(b) mpSet(mp=>mp.cap=b.dataset.c==='1');};
+}
+function bind(){
+  const $=id=>document.getElementById(id);
+  bindShared();
+  if(toast){const t=toast; setTimeout(()=>{if(toast===t){toast='';render();}},4000);}
+  if(L.view==='setup'){
+    if($('shareBtn')) $('shareBtn').onclick=createShared;
+    document.querySelectorAll('[data-join]').forEach(b=>b.onclick=()=>joinRound(b.dataset.join));
+    if($('endBtn')) $('endBtn').onclick=()=>{endStep='ask';render();const a=$('roundArea');if(a)a.scrollIntoView({block:'end'});};
+    if($('endBack')) $('endBack').onclick=()=>{endStep=null;render();};
+    if($('saveEnd')) $('saveEnd').onclick=()=>finishRound(true);
+    if($('discardEnd')) $('discardEnd').onclick=()=>{endStep='discard';render();};
+    if($('discardYes')) $('discardYes').onclick=()=>finishRound(false);
+    if(!$('course')) return;
+    $('rdate').onchange=e=>{const v=e.target.value||''; mutate(r=>r.setup.date=v,{setup:{date:v}});};
+    $('course').onchange=e=>mutate(r=>r.setup.course=e.target.value,{setup:{course:e.target.value}});
+    [0,1,2,3].forEach(k=>$('name'+k).onchange=e=>mutate(r=>r.setup.names[k]=e.target.value,{setup:{names:R.setup.names.map((n,j)=>j===k?e.target.value:n)}}));
+    document.querySelectorAll('input[name=mode]').forEach(x=>x.onchange=e=>mutate(r=>r.setup.mode=e.target.value,{setup:{mode:e.target.value}}));
+    const fp=$('fixedP'); if(fp) fp.onclick=e=>{const b=e.target.closest('[data-p]'); if(b) mutate(r=>r.setup.fixedPartner=+b.dataset.p,{setup:{fixedPartner:+b.dataset.p}});};
+    $('split').onclick=e=>{const b=e.target.closest('[data-s]'); if(!b) return; const on=b.dataset.s==='1';
+      const s=R.setup, n={split:on}; if(on&&!s.split){n.hcp2=s.hcp.slice(); n.hcpPar2=clone(s.hcpPar);}
+      mutate(r=>Object.assign(r.setup,clone(n)),{setup:n});};
+    document.querySelectorAll('[data-hcp]').forEach(g=>g.onclick=e=>{const b=e.target.closest('[data-hv]'); if(!b) return;
+      const f=g.dataset.half==='1'?'hcp2':'hcp', arr=R.setup[f].slice(); arr[+g.dataset.hcp]=b.dataset.hv;
+      mutate(r=>r.setup[f]=arr.slice(),{setup:{[f]:arr}});});
+    document.querySelectorAll('[data-pk]').forEach(b=>b.onclick=()=>{const f=b.dataset.half==='1'?'hcpPar2':'hcpPar', arr=clone(R.setup[f]), p=b.dataset.pp, k=+b.dataset.pk;
+      arr[k][p]=Math.max(0,(Number(arr[k][p])||0)+(+b.dataset.d)); mutate(r=>r.setup[f]=clone(arr),{setup:{[f]:arr}});});
+    if($('ordStart')) $('ordStart').onclick=()=>{ordPick=[];render();};
+    if($('ordCancel')) $('ordCancel').onclick=()=>{ordPick=null;render();};
+    document.querySelectorAll('[data-ord]').forEach(b=>b.onclick=()=>{ordPick.push(+b.dataset.ord);
+      if(ordPick.length===3) ordPick.push([0,1,2,3].find(k=>!ordPick.includes(k)));
+      if(ordPick.length===4){const o=ordPick.slice(); ordPick=null; mutate(r=>{r.setup.order=o.slice();r.setup.orderSet=true;},{setup:{order:o,orderSet:true}});} else render();});
+    $('meSel').onclick=e=>{const b=e.target.closest('[data-me]'); if(!b) return; const v=b.dataset.me===''?null:+b.dataset.me; mutate(r=>r.setup.me=v,{setup:{me:v}});};
+    $('go').onclick=()=>setTab('hole');
+    bindMp();
+  } else if(L.view==='hole'){
+    if(!$('prev')) return;
+    const i=L.cur, H=R.holes[i];
+    if($('ordGo')) $('ordGo').onclick=()=>{setTab('setup'); window.scrollTo(0,0);};
+    $('prev').onclick=()=>{L.cur--;saveL();render();};
+    $('next').onclick=()=>{L.cur++;saveL();render();};
+    if($('par')) $('par').onclick=e=>{const b=e.target.closest('[data-par]'); if(b) mutate(r=>r.holes[i].par=+b.dataset.par,holePatch(i,{par:+b.dataset.par}));};
+    $('players').onclick=e=>{const h=e.target.closest('[data-hk]');
+      if(h){const k=+h.dataset.hk, v=Math.max(0,(Number(H.h[k])||0)+(+h.dataset.d)); mutate(r=>r.holes[i].h[k]=v,holePatch(i,{h:{[k]:v}}));return;}
+      const b=e.target.closest('[data-k]'); if(!b) return; const k=+b.dataset.k,d=+b.dataset.d;
+      const v=H.s[k]==null?H.par:Math.max(1,H.s[k]+d);
+      if(L.link&&curEv){const pid=L.link.members&&L.link.members[k]; if(!pid) return; Shared.setScore(L.link.code,pid,i,v);}
+      mutate(r=>r.holes[i].s[k]=v,holePatch(i,{s:{[k]:v}}));};
+    document.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{const f=b.dataset.x,d=+b.dataset.d;
+      const v=f==='carry'?Math.max(0,(Number(H.carry)||0)+d):Math.max(1,(Number(H.mult)||1)+d);
+      mutate(r=>r.holes[i][f]=v,holePatch(i,{[f]:v}));});
+    if($('putt')) $('putt').onclick=e=>{const b=e.target.closest('[data-pd]'); if(!b) return; const v=H.putt==null?2:Math.max(0,H.putt+(+b.dataset.pd)); mutate(r=>r.holes[i].putt=v,holePatch(i,{putt:v}));};
+    $('np').onclick=e=>{const b=e.target.closest('[data-np]'); if(!b) return; const v=b.dataset.np===''?null:+b.dataset.np; mutate(r=>r.holes[i].np=v,holePatch(i,{np:v}));};
+    const kp=$('kanP'); if(kp) kp.onclick=e=>{const b=e.target.closest('[data-p]'); if(b) mutate(r=>r.holes[i].partner=+b.dataset.p,holePatch(i,{partner:+b.dataset.p}));};
+  } else if(L.view==='sum'){
+    document.querySelectorAll('[data-go]').forEach(tr=>tr.onclick=()=>{L.cur=+tr.dataset.go;setTab('hole');});
+  } else {
+    document.querySelectorAll('[data-hist]').forEach(b=>b.onclick=()=>{histOpen=b.dataset.hist;histDel=null;render();});
+    if($('histBack')) $('histBack').onclick=()=>{histOpen=null;histDel=null;render();};
+    if($('delBtn')) $('delBtn').onclick=()=>{histDel=histOpen;render();};
+    if($('delNo')) $('delNo').onclick=()=>{histDel=null;render();};
+    if($('delYes')) $('delYes').onclick=async()=>{const rec=allHistory().find(h=>h.id===histOpen);
+      if(rec){ if(rec._local){L.history=L.history.filter(h=>h.id!==rec.id);saveL();}
+        else{try{await db.collection('data/users/'+myId).doc(rec.id).delete();}catch(e){toast='削除できませんでした。';}}}
+      histOpen=null;histDel=null;if(!toast)toast='記録を削除しました。';render();};
+    if($('copyBtn')) $('copyBtn').onclick=()=>{const ta=$('copyText'),txt=ta.value;
+      const fb=()=>{ta.hidden=false;ta.select();toast='文字を選択しました。長押しでコピーしてください。';render();};
+      try{navigator.clipboard.writeText(txt).then(()=>{toast='コピーしました。LINEなどに貼り付けられます。';render();},fb);}catch(e){fb();}};
+  }
+}
+if(L.pmode===undefined) L.pmode=localHasScores()?'solo':'code';
+// ID入りのURL（…#4821）で開いたら、そのまま参加の画面へ
+{const hm=(location.hash||'').match(/^#(\d{4})$/); if(hm&&!(L.link&&L.link.code===hm[1])){L.role='player'; L.pmode='code'; J.code=hm[1]; L.view='setup'; saveL();}}
+render();
+
+if(L.roundId){L.roundId=null;saveL();}
+</script>
+
+<script>
+// 電波がなくても開けるようにする仕組み（サービスワーカー）
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{});});}
+</script>
+</body>
+</html>
