@@ -840,6 +840,8 @@ function syncLinked(){curEv=null; const lk=L.link; if(!lk) return;
   if(st==='loading') return;
   if(!ev){toast='共有の期限が切れたため、共有から外れました。このスマホのスコアは残っています。'; L.link=null; saveL(); return;}
   const G=ev.groups[lk.gid];
+  // 参加した直後（20秒以内）は、共有データの更新が届くのを待つ
+  if((!G||!G.members.includes(lk.pid))&&lk.at&&Date.now()-lk.at<20000){setTimeout(remoteRender,1000); return;}
   if(!G||!G.members.includes(lk.pid)){toast='組から外れたため、共有をやめました。このスマホのスコアは残っています。'; L.link=null; saveL(); return;}
   curEv=ev; const R0=L.local;
   const mem=[lk.pid,...G.members.filter(x=>x!==lk.pid)]; lk.members=mem;
@@ -848,7 +850,7 @@ function syncLinked(){curEv=null; const lk=L.link; if(!lk) return;
   R0.setup.me=0; R0.setup.date=ev.date; R0.setup.course=evTitle(ev);
   saveL();
 }
-function linkTo(ev,gid,pid){L.local={setup:defaultSetup(),holes:blankHoles()}; L.link={code:ev.code,pid,gid}; L.cur=0; L.pmode='code';
+function linkTo(ev,gid,pid){L.local={setup:defaultSetup(),holes:blankHoles()}; L.link={code:ev.code,pid,gid,at:Date.now()}; L.cur=0; L.pmode='code';
   J={step:'code',code:'',msg:'',early:false,me:null,picks:[]}; saveL(); toast=`${gid}組で参加しました。スコアは同じ組の人と共有されます。`; render();}
 const localHasScores=()=>L.local.holes.some(H=>H.s.some(v=>v!=null));
 
@@ -1044,6 +1046,7 @@ function bindShared(){const $=id=>document.getElementById(id);
     if(!res||res.missing||!ev){J={step:'code',code:'',msg:'IDが見つかりません。期限が切れた可能性があります。',early:false,me:null,picks:[]}; render(); return;}
     if(res.already){J.step='confirm'; render(); return;}
     if(res.taken){toast=`${res.taken.map(p=>pName(ev,p)).join('・')}さんは、ほかの組に選ばれました。選び直してください。`; J.picks=J.picks.filter(p=>!res.taken.includes(p)); render(); return;}
+    if(!ev.groups[res.gid]) ev.groups[res.gid]={by:J.me,members:[J.me,...J.picks]};
     linkTo(ev,res.gid,J.me);};
   document.querySelectorAll('[data-grm]').forEach(b=>b.onclick=()=>{grmAsk=b.dataset.grm; render();});
   if($('leaveGrp')) $('leaveGrp').onclick=()=>{grmAsk='self'; render();};
