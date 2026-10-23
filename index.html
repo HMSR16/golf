@@ -58,6 +58,9 @@ h1{font-size:19px;margin:0;font-weight:700;letter-spacing:.02em}
 .hbody dl{margin:6px 0;display:grid;grid-template-columns:auto 1fr;gap:4px 12px}
 .hbody dt{font-weight:700}
 .hbody dd{margin:0}
+.hbody dl.faq{display:block}
+.hbody dl.faq dt{margin-top:10px}
+.hbody dl.faq dd{margin:2px 0 0}
 .hbody .ex{background:var(--accent-soft);border-radius:8px;padding:8px 10px}
 @media (max-width:420px){.hbody dl{grid-template-columns:1fr}.hbody dd{margin:0 0 6px}}
 h1 small{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
@@ -1201,10 +1204,11 @@ function vHelp(){
     </dl>`)}
   ${sec('6. 登録と履歴',`
     <p>履歴を残すのと、主催者としてIDを発行するには、メールアドレスの登録が必要です（「履歴」タブから）。</p>
-    <p>確認メールのリンクは<b>押さずに長押しでコピー</b>し、アプリに貼り付けます。登録すると、機種変更しても履歴が残ります。</p>
+    <p>登録は、<b>ホーム画面のアイコンから開いたアプリ</b>で行ってください。iPhoneでは、確認メールのリンクを<b>押さずに長押しでコピー</b>して、アプリに貼り付けます。</p>
+    <p>登録すると、機種変更しても同じアドレスで履歴を見られます。</p>
     <p>ラウンドが終わったら、設定画面の一番下「ラウンドを終了する」→「保存して終了」。</p>`)}
   ${sec('7. よくある質問',`
-    <dl>
+    <dl class="faq">
       <dt>途中でアプリを閉じてしまった</dt><dd>IDで参加中なら、もう一度IDを入れて自分の名前を選べば続きから入力できる。</dd>
       <dt>組が違う</dt><dd>組の変更は主催者が行う。主催者に伝える。</dd>
       <dt>2人・3人の組</dt><dd>ラスベガスは「しない」にする。単体で使う時は、使わない欄の名前を消す。</dd>
