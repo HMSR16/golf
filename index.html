@@ -906,6 +906,8 @@ function evEdit(ev){const hasSc=pid=>(ev.scores[pid]||[]).some(v=>v!=null);
     <div class="note">名前は直したあと、ほかの所を押すと保存されます。</div>
     <button class="btn" id="eDone">直し終わった</button></div>`;}
 function vOrg(){const o=orgDraft(), names=orgNames(), mine=myEvents().map(e=>Shared.get(e.code)).filter(Boolean);
+  // IDを発行できるのは、メールアドレスを登録した人だけ
+  if(!REG) return `${mine.map(evCard).join('')}${regCard('IDを発行するにはメールアドレスの登録が必要です')}`;
   return `${mine.map(evCard).join('')}
   <section class="card"><div class="label">新しいコンペを登録</div>
     <div class="label">開催日</div><input type="date" id="oDate" value="${esc(o.date)}">
@@ -961,7 +963,7 @@ function vGallery(){const g=L.gal||{}, ev=g.code&&g.ok?Shared.get(g.code):null;
   return `<section class="card">${evHead(ev)}${rankHtml(rankRows(ev),ev.pars,null)}<button class="btn ghost" id="galOut">IDを入れ直す</button></section>`;}
 
 /* ---------- 登録（履歴を残す人だけ） ---------- */
-function regCard(){
+function regCard(title){
   if(!REG){
     if(regStep==='sent') return `<section class="card"><div class="regmsg">確認メールを送りました</div>
       <div class="note">${esc(regMail||'')} に届いたメールの中のリンクを<b>長押しして「リンクをコピー」</b>し、下に貼り付けて「登録する」を押してください。</div>
@@ -970,12 +972,12 @@ function regCard(){
       <button class="btn" id="regDone"${busy?' disabled':''}>登録する</button>
       ${regMsg?`<div class="toast warn">${esc(regMsg)}</div>`:''}
       <button class="btn ghost" id="regRetry">メールアドレスを入れ直す</button></section>`;
-    return `<section class="card"><div class="regmsg">履歴を保存するにはメールアドレスの登録が必要です</div>
+    return `<section class="card"><div class="regmsg">${title||'履歴を保存するにはメールアドレスの登録が必要です'}</div>
     <input type="email" id="regMail" placeholder="メールアドレス" autocomplete="email" value="${esc(regMail)}">
     <button class="btn" id="regSend"${busy?' disabled':''}>確認メールを送る</button>
     <div class="or">または</div><button class="btn ghost" id="regGoogle">Googleでログイン</button>
     ${regMsg?`<div class="toast warn">${esc(regMsg)}</div>`:''}
-    <div class="note">アドレスは履歴の保存にだけ使います。${IS_DEMO?'試し用のため、今は確認メールは送られず、すぐに登録されます。':''}</div></section>`;}
+    <div class="note">アドレスは履歴の保存とIDの発行にだけ使います。${IS_DEMO?'試し用のため、今は確認メールは送られず、すぐに登録されます。':''}</div></section>`;}
   return `<section class="card"><div><div class="label">登録中</div><div>${esc(REG.label)}</div></div>
     ${regDel?`<div class="confirm"><div>登録をやめると、保存した履歴もすべて削除されます。元に戻せません。本当にやめますか？</div><div class="row"><button class="btn danger" id="regDelYes">やめて削除する</button><button class="btn ghost" id="regDelNo">戻る</button></div></div>`
       :`<button class="btn danger" id="regDel">登録をやめる（履歴も削除）</button>`}</section>`;}

@@ -33,8 +33,8 @@
       return ()=>{u1();u2();};},
     // IDを発行（4桁の数字。使われていない番号を選ぶ）
     async createEvent(d){const exp=TS.fromMillis(endOf(d.date));
-      // 発行した人だけがあとで直せるように、このスマホの持ち主の番号（ログインしていなければ名前のない仮の番号）を記録する
-      if(!auth.currentUser) await auth.signInAnonymously();
+      // 発行できるのはメールアドレス（またはGoogle）で登録した人だけ。発行した人だけがあとで直せるように記録する
+      if(!auth.currentUser||auth.currentUser.isAnonymous) throw new Error('need-login');
       const owner=auth.currentUser.uid;
       for(let n=0;n<15;n++){const code=String(1000+Math.floor(Math.random()*9000)), ref=evRef(code);
         try{

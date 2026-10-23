@@ -8,7 +8,8 @@ service cloud.firestore {
       allow get: if resource == null || request.time < resource.data.expireAt;
       allow create: if code.matches('^[0-9]{4}$')
         && request.resource.data.code == code
-        && request.auth != null && request.resource.data.owner == request.auth.uid
+        && request.auth != null && request.auth.token.firebase.sign_in_provider != 'anonymous'
+        && request.resource.data.owner == request.auth.uid
         && okEvent(request.resource.data)
         && request.resource.data.expireAt > request.time
         && request.resource.data.expireAt < request.time + duration.value(400, 'd');
