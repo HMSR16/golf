@@ -145,6 +145,7 @@ input[type=email]{font:inherit;font-size:17px;color:var(--fg);background:var(--b
 .rh{font-family:var(--font-num);font-size:20px;font-weight:700;text-align:center}
 .ropen{padding:8px 0}
 .nw{white-space:nowrap}
+.pickbox{display:flex;flex-direction:column;gap:8px;border:2px solid var(--accent);border-radius:10px;padding:10px}
 .editbox{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:12px}
 .elist{display:flex;flex-direction:column;gap:6px}
 .erow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
@@ -777,6 +778,10 @@ function demoBackend(){
     async removeFromGroup(code,pid){const a=all(), ev=a[code]; if(!ev) return; const k=grp(ev,pid); if(!k) return;
       const G=ev.groups[k]; G.members=G.members.filter(x=>x!==pid); if(!G.members.length) delete ev.groups[k]; save(a); notify(code);},
     async cleanup(){},
+    // 主催者が組を決める（ほかの組に入っていた人は、その組から移す）
+    async setGroup(code,gid,members){const a=all(), ev=a[code]; if(!ev) return;
+      for(const k in ev.groups){if(k!==gid){ev.groups[k].members=ev.groups[k].members.filter(x=>!members.includes(x)); if(!ev.groups[k].members.length) delete ev.groups[k];}}
+      if(members.length) ev.groups[gid]={by:'org',members:members.slice()}; else delete ev.groups[gid]; save(a); notify(code);},
     // 主催者による修正（パー・参加者）
     async editPars(code,pars){const a=all(), ev=a[code]; if(!ev) return; ev.pars=pars.slice(); save(a); notify(code);},
     async renamePlayer(code,pid,name){const a=all(), ev=a[code]; if(!ev) return; const p=ev.players.find(x=>x.id===pid); if(p) p.name=name; save(a); notify(code);},
@@ -816,12 +821,13 @@ const Shared={
 const netErr=()=>{toast='通信できませんでした。電波の良い所でもう一度お試しください。'; render();};
 
 const pName=(ev,pid)=>{const p=ev.players.find(x=>x.id===pid); return p?p.name:'?';};
+const byName=(ev,G)=>G.by==='org'?'主催者':pName(ev,G.by);
 function groupOf(ev,pid){for(const g in ev.groups) if(ev.groups[g].members.includes(pid)) return g; return null;}
 const fmtD=d=>{const p=String(d||'').split('-'); return p.length===3?`${+p[1]}月${+p[2]}日`:'';};
 const shareUrl=code=>`https://hmsr16.github.io/golf/#${code}`;
 const evTitle=ev=>ev.name||ev.course||'コンペ';
 
-let curEv=null, J={step:'code',code:'',msg:'',early:false,me:null,picks:[]}, galMsg='', galEarly=false, orgMsg='', grmAsk=null, ormAsk=null, orgEdit=null, prmAsk=null, rankOpen=null, regMsg='', regDel=false, busy=false;
+let orgPick=null, curEv=null, J={step:'code',code:'',msg:'',early:false,me:null,picks:[]}, galMsg='', galEarly=false, orgMsg='', grmAsk=null, ormAsk=null, orgEdit=null, prmAsk=null, rankOpen=null, regMsg='', regDel=false, busy=false;
 let REG=null, HIST=[], unsubH=null, regStep=null, regMail='', regLink='';
 
 // 登録の状態と履歴の読み込み
@@ -884,15 +890,22 @@ function orgDraft(){if(!L.org) L.org={date:today(),name:'',course:'',pars:Array(
 function orgNames(){return orgDraft().names.split('\n').map(s=>s.trim()).filter(Boolean);}
 // 発行したイベント（このスマホで発行したもの）。期限が過ぎたものは一覧から外す
 function myEvents(){const now=Date.now(); return (L.myEvents||[]).map(e=>typeof e==='string'?{code:e}:e).filter(e=>!e.end||now<=e.end);}
+// 組の人を選ぶ（主催者）。ほかの組に入っている人も選べ、選ぶとこの組に移る
+function pickBox(ev,g){const sel=orgPick.sel;
+  return `<div class="pickbox"><b>${g}組の人を選んでください（最大4人）</b>
+    <div class="plist">${ev.players.map(p=>{const og=groupOf(ev,p.id), on=sel.includes(p.id);
+      return `<button class="pbtn${on?' on':''}" data-gsel="${p.id}" aria-pressed="${on}">${esc(p.name)}${og&&og!==g?`<small>今は${og}組</small>`:''}</button>`;}).join('')}</div>
+    <div class="note">${g}組：${sel.length?sel.map(x=>esc(pName(ev,x))).join('・'):'まだ選んでいません'}</div>
+    <div class="row"><button class="btn" id="gSave">${g}組をこの人で決める</button><button class="btn ghost" id="gCancel">やめる</button></div></div>`;}
 function evCard(ev){const inG=new Set(Object.values(ev.groups).flatMap(G=>G.members)), rest=ev.players.filter(p=>!inG.has(p.id));
   const gs=Object.keys(ev.groups).sort((a,b)=>a-b);
   return `<section class="card issued">${evHead(ev)}
     <div class="bigcode">${ev.code}</div>
     <div class="urlrow"><span class="url">${esc(shareUrl(ev.code))}</span><button class="chip" data-copy="${esc(shareUrl(ev.code))}">URLをコピー</button></div>
     <div class="note">共有できるのは ${fmtD(ev.date)} 0時から48時間です。参加者 ${ev.players.length}人。</div>
-    <div class="label">組分けの状況</div>
-    ${gs.length?gs.map(g=>{const G=ev.groups[g]; return `<div class="grow"><b>${g}組</b><span class="note">（${esc(pName(ev,G.by))}が選択）</span><div class="chips">${G.members.map(x=>`<button class="chip" data-orm="${ev.code}|${x}">${esc(pName(ev,x))} ✕</button>`).join('')}</div></div>`;}).join(''):'<div class="note">まだ組はできていません。</div>'}
-    ${ormAsk&&ormAsk.startsWith(ev.code+'|')?(()=>{const pid=ormAsk.split('|')[1]; return `<div class="confirm"><div><b>${esc(pName(ev,pid))}</b>さんを組から外しますか？ 入力済みのスコアは消えません。</div><div class="row"><button class="btn danger" id="ormYes">外す</button><button class="btn ghost" id="ormNo">やめる</button></div></div>`;})():''}
+    <div class="label">組み合わせ</div>
+    ${gs.length?gs.map(g=>{const G=ev.groups[g]; return orgPick&&orgPick.code===ev.code&&orgPick.gid===g?pickBox(ev,g):`<div class="grow"><div class="row" style="justify-content:space-between"><b>${g}組</b><button class="chip" data-gedit="${ev.code}|${g}">人を変える</button></div><div class="note">${G.members.map(x=>esc(pName(ev,x))).join('・')}</div></div>`;}).join(''):'<div class="note">まだ組は決まっていません。</div>'}
+    ${orgPick&&orgPick.code===ev.code&&!ev.groups[orgPick.gid]?pickBox(ev,orgPick.gid):`<button class="btn ghost" data-gnew="${ev.code}">${gs.length?'次の組を決める':'1組目を決める'}</button>`}
     ${rest.length?`<div class="note">まだ組に入っていない人：${rest.map(p=>esc(p.name)).join('・')}</div>`:''}
     ${orgEdit===ev.code?evEdit(ev):`<button class="btn ghost" data-oedit="${ev.code}">内容を直す（パー・参加者）</button>`}
   </section>`;}
@@ -934,26 +947,26 @@ function vJoin(){
     <div class="or">または</div><button class="btn ghost" id="soloGo">単体で始める（共有しない）</button></section>`;
   const ev=Shared.get(J.code);
   if(!ev){if(Shared.status(J.code)==='loading') return loadingCard(); J={step:'code',code:'',msg:'IDが見つかりません。期限が切れた可能性があります。',early:false,me:null,picks:[]}; return vJoin();}
-  const gl=p=>{const g=groupOf(ev,p.id); return g?`<small>${g}組（${esc(pName(ev,ev.groups[g].by))}が選択）</small>`:'';};
+  const gl=p=>{const g=groupOf(ev,p.id); return g?`<small>${g}組（${esc(byName(ev,ev.groups[g]))}が選択）</small>`:'';};
   if(J.step==='name') return `<section class="card">${evHead(ev)}<div class="label">自分の名前を選んでください</div>
     <div class="plist">${ev.players.map(p=>`<button class="pbtn" data-jme="${p.id}">${esc(p.name)}${gl(p)}</button>`).join('')}</div>
     <button class="btn ghost" id="joinBack">戻る</button></section>`;
-  if(J.step==='confirm'){const g=groupOf(ev,J.me); if(!g){J.step='pick';return vJoin();} const G=ev.groups[g];
-    return `<section class="card">${evHead(ev)}<div class="ask"><b>${esc(pName(ev,J.me))}</b>さんは<b>${g}組</b>（${esc(pName(ev,G.by))}が選択）です。この組で参加しますか？</div>
-      <div class="note">${g}組：${G.members.map(x=>esc(pName(ev,x))).join('・')}</div>
-      <div class="row"><button class="btn" id="jJoin">参加する</button><button class="btn danger" id="jWrong"${busy?' disabled':''}>違う組です</button></div>
-      <button class="btn ghost" id="joinBack">戻る</button></section>`;}
-  return `<section class="card">${evHead(ev)}<div class="label">同じ組の人を選んでください（最大3人）</div>
-    <div class="plist">${ev.players.filter(p=>p.id!==J.me).map(p=>{const g=groupOf(ev,p.id), on=J.picks.includes(p.id);
-      return `<button class="pbtn${on?' on':''}" data-jpk="${p.id}" ${g?'disabled':''} aria-pressed="${on}">${esc(p.name)}${gl(p)}</button>`;}).join('')}</div>
-    <div class="note">この組：${[J.me,...J.picks].map(x=>esc(pName(ev,x))).join('・')}</div>
-    <button class="btn" id="jStart"${busy?' disabled':''}>${busy?'登録しています…':'この組で始める'}</button><button class="btn ghost" id="joinBack">戻る</button></section>`;}
+  // 組は主催者が決める。プレーヤーは自分の名前を選ぶだけ
+  const g=groupOf(ev,J.me);
+  if(!g) return `<section class="card">${evHead(ev)}<div class="ask"><b>${esc(pName(ev,J.me))}</b>さんの組は、まだ決まっていません。</div>
+    <div class="note">主催者に組を決めてもらってから、もう一度お試しください。</div><button class="btn ghost" id="joinBack">戻る</button></section>`;
+  const G=ev.groups[g];
+  return `<section class="card">${evHead(ev)}<div class="ask"><b>${esc(pName(ev,J.me))}</b>さんは<b>${g}組</b>です。この組で参加しますか？</div>
+    <div class="note">${g}組：${G.members.map(x=>esc(pName(ev,x))).join('・')}</div>
+    <button class="btn" id="jJoin">参加する</button>
+    <div class="note">組が違う場合は、主催者に伝えてください。</div>
+    <button class="btn ghost" id="joinBack">戻る</button></section>`;}
 function vLinkedCard(){const ev=curEv, lk=L.link, G=ev.groups[lk.gid];
   return `<section class="card linked">${evHead(ev)}
-    <div><b>${lk.gid}組</b>：${G.members.map(x=>esc(pName(ev,x))).join('・')}<span class="note">（${esc(pName(ev,G.by))}が選択）</span></div>
-    ${G.by===lk.pid&&G.members.length>1?`<div class="chips">${G.members.filter(x=>x!==lk.pid).map(x=>`<button class="chip" data-grm="${x}">${esc(pName(ev,x))}を外す</button>`).join('')}</div>`:''}
-    ${grmAsk?`<div class="confirm"><div>${grmAsk==='self'?'この組から抜けますか？ このスマホのスコアは残りますが、共有はやめます。':`<b>${esc(pName(ev,grmAsk))}</b>さんを${lk.gid}組から外しますか？ 入力済みのスコアは消えません。`}</div><div class="row"><button class="btn danger" id="grmYes">${grmAsk==='self'?'抜ける':'外す'}</button><button class="btn ghost" id="grmNo">やめる</button></div></div>`
-      :`<button class="btn ghost" id="leaveGrp">この組から抜ける</button>`}
+    <div><b>${lk.gid}組</b>：${G.members.map(x=>esc(pName(ev,x))).join('・')}</div>
+    <div class="note">組の変更は主催者が行います。</div>
+    ${grmAsk==='self'?`<div class="confirm"><div>このスマホでの共有をやめますか？ 組はそのままで、このスマホのスコアも残ります。もう一度IDを入れれば、続きから参加できます。</div><div class="row"><button class="btn danger" id="grmYes">共有をやめる</button><button class="btn ghost" id="grmNo">やめない</button></div></div>`
+      :`<button class="btn ghost" id="leaveGrp">このスマホでの共有をやめる</button>`}
   </section>`;}
 
 /* ---------- ギャラリー ---------- */
@@ -1003,7 +1016,15 @@ function bindShared(){const $=id=>document.getElementById(id);
         L.myEvents=myEvents().concat([{code,end:evEnd({date:o.date}),n:names.length}]); L.org=null; saveL(); toast=`ID「${code}」を発行しました。`; window.scrollTo(0,0);}
       catch(e){orgMsg='発行できませんでした。電波の良い所でもう一度お試しください。';}
       busy=false; render();};}
-  document.querySelectorAll('[data-orm]').forEach(b=>b.onclick=()=>{ormAsk=b.dataset.orm; render();});
+  document.querySelectorAll('[data-gnew]').forEach(b=>b.onclick=()=>{const ev=Shared.get(b.dataset.gnew); if(!ev) return;
+    orgPick={code:ev.code,gid:String(Math.max(0,...Object.keys(ev.groups).map(Number))+1),sel:[]}; render();});
+  document.querySelectorAll('[data-gedit]').forEach(b=>b.onclick=()=>{const [code,g]=b.dataset.gedit.split('|'), ev=Shared.get(code); if(!ev) return;
+    orgPick={code,gid:g,sel:ev.groups[g].members.slice()}; render();});
+  document.querySelectorAll('[data-gsel]').forEach(b=>b.onclick=()=>{const p=b.dataset.gsel, sel=orgPick.sel;
+    if(sel.includes(p)) orgPick.sel=sel.filter(x=>x!==p); else if(sel.length<4) sel.push(p); else toast='1つの組は4人までです。'; render();});
+  if($('gCancel')) $('gCancel').onclick=()=>{orgPick=null; render();};
+  if($('gSave')) $('gSave').onclick=()=>{const {code,gid,sel}=orgPick; orgPick=null;
+    B.setGroup(code,gid,sel).then(()=>{toast=sel.length?`${gid}組を決めました。`:`${gid}組をなくしました。`; render();}).catch(()=>{toast='組を決められませんでした。このIDを発行した人のスマホから、電波の良い所でお試しください。'; render();}); render();};
   if($('ormNo')) $('ormNo').onclick=()=>{ormAsk=null;render();};
   document.querySelectorAll('[data-oedit]').forEach(b=>b.onclick=()=>{orgEdit=b.dataset.oedit; prmAsk=null; render();});
   if($('eDone')) $('eDone').onclick=()=>{orgEdit=null; prmAsk=null; render();};
@@ -1034,8 +1055,8 @@ function bindShared(){const $=id=>document.getElementById(id);
     if(Date.now()<evStart(ev)){J.msg=`このコンペは${fmtD(ev.date)}から参加できます。`; J.early=true; render(); return;}
     J.step='name'; render();};
   if($('joinForce')) $('joinForce').onclick=()=>{J.msg='';J.early=false;J.step='name';render();};
-  if($('joinBack')) $('joinBack').onclick=()=>{J.step=J.step==='name'?'code':'name'; J.picks=[]; render();};
-  document.querySelectorAll('[data-jme]').forEach(b=>b.onclick=()=>{const ev=Shared.get(J.code); J.me=b.dataset.jme; J.picks=[]; J.step=ev&&groupOf(ev,J.me)?'confirm':'pick'; render();});
+  if($('joinBack')) $('joinBack').onclick=()=>{J.step=J.step==='name'?'code':'name'; render();};
+  document.querySelectorAll('[data-jme]').forEach(b=>b.onclick=()=>{J.me=b.dataset.jme; J.picks=[]; J.step='confirm'; render();});
   if($('jJoin')) $('jJoin').onclick=()=>{const ev=Shared.get(J.code), g=ev&&groupOf(ev,J.me); if(g) linkTo(ev,g,J.me);};
   if($('jWrong')) $('jWrong').onclick=async()=>{busy=true; render(); try{await B.removeFromGroup(J.code,J.me); J.step='pick'; J.picks=[];}catch(e){netErr();} busy=false; render();};
   document.querySelectorAll('[data-jpk]').forEach(b=>b.onclick=()=>{const p=b.dataset.jpk;
@@ -1051,9 +1072,7 @@ function bindShared(){const $=id=>document.getElementById(id);
   document.querySelectorAll('[data-grm]').forEach(b=>b.onclick=()=>{grmAsk=b.dataset.grm; render();});
   if($('leaveGrp')) $('leaveGrp').onclick=()=>{grmAsk='self'; render();};
   if($('grmNo')) $('grmNo').onclick=()=>{grmAsk=null;render();};
-  if($('grmYes')) $('grmYes').onclick=()=>{const who=grmAsk==='self'?L.link.pid:grmAsk, code=L.link.code;
-    B.removeFromGroup(code,who).catch(netErr);
-    if(grmAsk==='self'){L.link=null; L.pmode='code'; saveL(); toast='組から抜けました。';} grmAsk=null; render();};
+  if($('grmYes')) $('grmYes').onclick=()=>{L.link=null; L.pmode='code'; saveL(); toast='このスマホでの共有をやめました。'; grmAsk=null; render();};
   // ギャラリー
   if($('galGo')) $('galGo').onclick=async()=>{const c=($('galCode').value||'').replace(/\D/g,''); galMsg=''; galEarly=false; L.gal={code:c,ok:false};
     const ev=c.length===4?await Shared.load(c):null; if(!ev) galMsg='IDが見つかりません。数字を確かめてください。';

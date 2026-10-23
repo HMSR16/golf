@@ -60,6 +60,12 @@
     async cleanup(code){const ref=evRef(code);
       for(let j=1;j<=60;j++){try{await ref.collection('scores').doc('p'+j).delete();}catch(e){}}
       try{await ref.delete();}catch(e){}},
+    // 主催者が組を決める（ほかの組に入っていた人は、その組から移す）
+    setGroup(code,gid,members){const ref=evRef(code);
+      return db.runTransaction(async t=>{const s=await t.get(ref); const g=Object.assign({},s.data().groups||{});
+        for(const k of Object.keys(g)){if(k!==gid){const m=g[k].members.filter(x=>!members.includes(x)); if(m.length) g[k]={by:g[k].by,members:m}; else delete g[k];}}
+        if(members.length) g[gid]={by:'org',members:members.slice()}; else delete g[gid];
+        t.update(ref,{groups:g});});},
     // 主催者による修正（発行した人だけ。ルールでも確かめる）
     editPars(code,pars){return evRef(code).update({pars:pars.slice()});},
     renamePlayer(code,pid,name){const ref=evRef(code);

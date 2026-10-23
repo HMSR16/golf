@@ -13,11 +13,10 @@ service cloud.firestore {
         && okEvent(request.resource.data)
         && request.resource.data.expireAt > request.time
         && request.resource.data.expireAt < request.time + duration.value(400, 'd');
-      allow update: if request.time < resource.data.expireAt && (
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['groups'])
-        || (request.auth != null && request.auth.uid == resource.data.owner
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['groups', 'pars', 'players'])
-            && okEvent(request.resource.data)));
+      allow update: if request.time < resource.data.expireAt
+        && request.auth != null && request.auth.uid == resource.data.owner
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['groups', 'pars', 'players'])
+        && okEvent(request.resource.data);
       allow delete: if request.time > resource.data.expireAt;
       match /scores/{pid} {
         allow read, create, update: if evExists(code) && request.time < evData(code).expireAt;
