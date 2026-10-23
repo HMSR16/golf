@@ -972,7 +972,10 @@ function vLinkedCard(){const ev=curEv, lk=L.link, G=ev.groups[lk.gid];
   return `<section class="card linked">${evHead(ev)}
     <div><b>${lk.gid}組</b>：${G.members.map(x=>esc(pName(ev,x))).join('・')}</div>
     <div class="note">組の変更は主催者が行います。</div>
-    ${grmAsk==='self'?`<div class="confirm"><div>このスマホでの共有をやめますか？ 組はそのままで、このスマホのスコアも残ります。もう一度IDを入れれば、続きから参加できます。</div><div class="row"><button class="btn danger" id="grmYes">共有をやめる</button><button class="btn ghost" id="grmNo">やめない</button></div></div>`
+  </section>`;}
+// 「このスマホでの共有をやめる」は設定画面の一番下に出す
+function vLeaveCard(){
+  return `<section class="card">${grmAsk==='self'?`<div class="confirm"><div>このスマホでの共有をやめますか？ 組はそのままで、このスマホのスコアも残ります。もう一度IDを入れれば、続きから参加できます。</div><div class="row"><button class="btn danger" id="grmYes">共有をやめる</button><button class="btn ghost" id="grmNo">やめない</button></div></div>`
       :`<button class="btn ghost" id="leaveGrp">このスマホでの共有をやめる</button>`}
   </section>`;}
 
@@ -1123,7 +1126,7 @@ function vSetupAll(){
   if(L.role==='organizer') return roleCard()+vOrg();
   if(L.role==='gallery') return roleCard()+vGallery();
   if(!L.link&&L.pmode!=='solo') return roleCard()+vJoin();
-  return roleCard()+(L.link?(curEv?vLinkedCard():loadingCard('共有データを読み込み中…')):`<section class="card"><button class="btn ghost" id="toJoin">IDで参加する</button></section>`)+vSetup();}
+  return roleCard()+(L.link?(curEv?vLinkedCard():loadingCard('共有データを読み込み中…')):`<section class="card"><button class="btn ghost" id="toJoin">IDで参加する</button></section>`)+vSetup()+(L.link&&curEv?vLeaveCard():'');}
 function vHist(){if(!REG) return regCard(); return vHistInner()+(histOpen?'':regCard());}
 
 function mpSet(f){const mp=clone(R.setup.mp); f(mp); mutate(r=>r.setup.mp=clone(mp),{setup:{mp}});}
