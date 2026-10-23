@@ -13,6 +13,10 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;-webkit-text-size-adjust:100%}img{max-width:100%}[hidden]{display:none!important}</style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="backend-firebase.js"></script>
 </head>
 <body>
 <title>ラスベガス計算</title>
@@ -485,7 +489,7 @@ async function createShared(){
 const isHost=()=>!!(shared&&shared.meta&&myId&&shared.meta.createdBy===myId);
 
 /* ---------- history ---------- */
-function allHistory(){const a=[...dbHistory,...L.history.map(h=>({...h,_local:true}))];
+function allHistory(){const a=HIST.slice();
   return a.sort((x,y)=>String(y.date||'').localeCompare(String(x.date||''))||(y.savedAt||0)-(x.savedAt||0));}
 async function saveHistory(){
   const r=R, t=withR(r,totals);
@@ -494,11 +498,11 @@ async function saveHistory(){
   // IDで参加していたら、その時点の順位表と場外マッチのスコアも一緒に残す
   if(L.link&&curEv){rec.rank=rankRows(curEv); rec.pars=curEv.pars.slice(); rec.pid=L.link.pid; rec.evName=evTitle(curEv);
     const lk=rec.setup.mp.lk||{}; for(const id in lk){rec.setup.mp.xs[id]=(curEv.scores[lk[id]]||Array(HOLES).fill(null)).slice();} rec.setup.mp.lk={};}
-  if(db&&myId){try{await db.collection('data/users/'+myId).doc(rec.id).set(rec);return true;}catch(e){}}
-  L.history.push(rec); saveL(); return true;
+  if(!REG) return false;
+  try{await B.history.save(REG.uid,JSON.parse(JSON.stringify(rec))); return true;}catch(e){toast='履歴に保存できませんでした。電波の良い所でもう一度お試しください。'; return false;}
 }
 async function finishRound(keep){
-  if(keep) await saveHistory();
+  if(keep&&!(await saveHistory())){render(); return;}
   const setup=clone(R.setup);
   if(shared){ if(isHost()&&!shared.ended){try{await db.doc('rounds/'+shared.id).delete();}catch(e){}} leaveShared(); }
   L.link=null; L.pmode=null; curEv=null;
@@ -563,8 +567,8 @@ function endCard(){
     <div><b>${ended?'ホストがラウンドを終了しました。':'ラウンドを終了します。'}</b>このラウンドの記録をどうしますか？</div>
     <div class="note">${ended?'今画面に出ているスコアを、あなたの履歴に保存できます。'
       :shared?(isHost()?'あなたはホストなので、終了するとみんなの画面の共有データも消えます。各自が保存した履歴は残ります。':'あなたのスマホだけがラウンドから外れます。ほかの人の画面はそのままです。')
-      :'保存すると「履歴」タブにいつでも見られる形で残ります。'}${L.reg?'':'<br>履歴に残すにはメールアドレスの登録が必要です。「登録して保存する」を押すと登録画面に移ります（入力中のスコアはそのまま残ります）。'}</div>
-    <div class="row">${L.reg?'<button class="btn" id="saveEnd">保存して終了</button>':'<button class="btn" id="regGo">登録して保存する</button>'}<button class="btn danger" id="discardEnd">保存しない</button>${ended?'':`<button class="btn ghost" id="endBack">やめる</button>`}</div></section>`;
+      :'保存すると「履歴」タブにいつでも見られる形で残ります。'}${REG?'':'<br>履歴に残すにはメールアドレスの登録が必要です。「登録して保存する」を押すと登録画面に移ります（入力中のスコアはそのまま残ります）。'}</div>
+    <div class="row">${REG?'<button class="btn" id="saveEnd">保存して終了</button>':'<button class="btn" id="regGo">登録して保存する</button>'}<button class="btn danger" id="discardEnd">保存しない</button>${ended?'':`<button class="btn ghost" id="endBack">やめる</button>`}</div></section>`;
 }
 function hcpBlock(s,h){const T=h?s.hcp2:s.hcp, P=h?s.hcpPar2:s.hcpPar;
   return `<div class="hcpgrid">${[0,1,2,3].map(k=>`<div>${esc(N(k))}</div><div class="chips" data-hcp="${k}" data-half="${h}">${[['none','なし'],['all1','オール1'],['par','パー別'],['hole','ホール毎']].map(([v,l])=>`<button class="chip" data-hv="${v}" aria-pressed="${T[k]===v}">${l}</button>`).join('')}</div>${T[k]==='par'?`<div class="parh">${[3,4,5].map(p=>`<div class="mini-step"><span>パー${p}</span><button data-pk="${k}" data-pp="${p}" data-half="${h}" data-d="-1" aria-label="パー${p}のハンデを減らす">−</button><b>${P[k][p]}</b><button data-pk="${k}" data-pp="${p}" data-half="${h}" data-d="1" aria-label="パー${p}のハンデを増やす">＋</button></div>`).join('')}</div>`:''}`).join('')}</div>`;}
@@ -739,36 +743,90 @@ function vHistInner(){
   return `<section class="card"><div class="label">履歴（保存したラウンド）</div><div class="opt">${list.map(h=>{
     const names=(h.setup&&h.setup.names)||[];
     return `<button class="joinitem" data-hist="${esc(h.id)}"><b>${esc(h.date)}　${esc(h.setup.course||'')}</b><span>${names.map((n,k)=>`${esc(n)} ${sign((h.tot||[])[k]||0)}`).join('　')}</span></button>`;}).join('')}</div>
-    <div class="note">履歴は登録したアカウントに保存されます（試し用の今は、このスマホの中に保存しています）。</div></section>`;
+    <div class="note">履歴は登録したアカウントに保存されます${IS_DEMO?'（試し用の今は、このスマホの中に保存しています）':''}。</div></section>`;
 }
 
 
-/* ========== 共有（試し用：このスマホの中だけで動く仮の仕組み。引っ越し後はFirebaseに差し替える） ========== */
+/* ========== IDでの共有・登録・履歴 ==========
+   保存先（バックエンド）は2種類。公開版（GitHub）では Firebase、ここ（試し用）ではこのスマホの中だけで動く仮の仕組み。
+   どちらも同じ使い方（B.watch / B.createEvent など）にしてあるので、画面のプログラムは共通。 */
 const SKEY='vegas-shared-demo-v1', MAXP=40;
 const evStart=ev=>new Date(ev.date+'T00:00:00').getTime();
 const evEnd=ev=>evStart(ev)+48*3600*1000;   // 開催日の0時から48時間で消える
+function demoBackend(){
+  const all=()=>{try{return JSON.parse(localStorage.getItem(SKEY))||{};}catch(e){return {};}};
+  const save=a=>{try{localStorage.setItem(SKEY,JSON.stringify(a));}catch(e){}};
+  const subs={}, notify=code=>(subs[code]||[]).forEach(cb=>cb(read(code)));
+  const read=code=>{const a=all(), ev=a[code]; if(!ev) return null; if(Date.now()>evEnd(ev)){delete a[code]; save(a); return null;} return clone(ev);};
+  const grp=(ev,p)=>Object.keys(ev.groups).find(k=>ev.groups[k].members.includes(p))||null;
+  let regCb=null;
+  const regGet=()=>{try{return JSON.parse(localStorage.getItem('vegas-demo-reg'));}catch(e){return null;}};
+  const regSet=v=>{try{v?localStorage.setItem('vegas-demo-reg',JSON.stringify(v)):localStorage.removeItem('vegas-demo-reg');}catch(e){} if(regCb) regCb(v);};
+  const hsubs=[], hnotify=()=>hsubs.forEach(cb=>cb(clone(L.history)));
+  return {name:'demo',
+    watch(code,cb){(subs[code]||(subs[code]=[])).push(cb); setTimeout(()=>cb(read(code)),0); return ()=>{subs[code]=subs[code].filter(x=>x!==cb);};},
+    async createEvent(d){const a=all(); let code; do{code=String(1000+Math.floor(Math.random()*9000));}while(a[code]);
+      a[code]={code,date:d.date,name:d.name,course:d.course,pars:d.pars.slice(),players:d.players.map((n,j)=>({id:'p'+(j+1),name:n})),groups:{},scores:{}}; save(a); return code;},
+    async setScore(code,pid,i,v){const a=all(), ev=a[code]; if(!ev) return; (ev.scores[pid]||(ev.scores[pid]=Array(HOLES).fill(null)))[i]=v; save(a); notify(code);},
+    async createGroup(code,me,picks){const a=all(), ev=a[code]; if(!ev) return {missing:true};
+      if(grp(ev,me)) return {already:grp(ev,me)}; const taken=picks.filter(p=>grp(ev,p)); if(taken.length) return {taken};
+      const gid=String(Math.max(0,...Object.keys(ev.groups).map(Number))+1); ev.groups[gid]={by:me,members:[me,...picks]}; save(a); notify(code); return {gid};},
+    async removeFromGroup(code,pid){const a=all(), ev=a[code]; if(!ev) return; const k=grp(ev,pid); if(!k) return;
+      const G=ev.groups[k]; G.members=G.members.filter(x=>x!==pid); if(!G.members.length) delete ev.groups[k]; save(a); notify(code);},
+    async cleanup(){},
+    auth:{instant:true,
+      onChange(cb){regCb=cb; setTimeout(()=>cb(regGet()),0);},
+      isLink(){return false;},
+      async sendLink(email){regSet({uid:'demo',label:email});},
+      async completeLink(){},
+      async google(){regSet({uid:'demo',label:'Googleアカウント（試し用）'});},
+      async deleteAccount(){L.history=[]; saveL(); hnotify(); regSet(null); return {ok:true};}},
+    history:{
+      watch(uid,cb){hsubs.push(cb); setTimeout(()=>cb(clone(L.history)),0); return ()=>{const i=hsubs.indexOf(cb); if(i>=0) hsubs.splice(i,1);};},
+      async save(uid,rec){L.history.push(rec); saveL(); hnotify();},
+      async del(uid,id){L.history=L.history.filter(h=>h.id!==id); saveL(); hnotify();}}
+  };
+}
+const B=window.VEGAS_BACKEND||demoBackend();
+const IS_DEMO=B.name==='demo';
+
+// 共有データの読み込み（画面はここに入っている最新の内容を表示する）
+const EV={}, EVS={};
 const Shared={
-  _all(){try{return JSON.parse(localStorage.getItem(SKEY))||{};}catch(e){return {};}},
-  _save(a){try{localStorage.setItem(SKEY,JSON.stringify(a));}catch(e){}},
-  get(code){const a=this._all(), ev=a[code]; if(!ev) return null; if(Date.now()>evEnd(ev)){delete a[code]; this._save(a); return null;} return ev;},
-  put(ev){const a=this._all(); a[ev.code]=ev; this._save(a);},
-  create(d){const a=this._all(); let code; do{code=String(1000+Math.floor(Math.random()*9000));}while(a[code]);
-    const ev={code,date:d.date,name:d.name,course:d.course,pars:d.pars.slice(),players:d.players.map((n,j)=>({id:'p'+(j+1),name:n})),groups:{},scores:{},createdAt:Date.now()};
-    a[code]=ev; this._save(a); return ev;},
-  setScore(code,pid,i,v){const ev=this.get(code); if(!ev) return; (ev.scores[pid]||(ev.scores[pid]=Array(HOLES).fill(null)))[i]=v; this.put(ev);}
+  get(code){if(!code) return null; this.watch(code); return EV[code]||null;},
+  status(code){return EVS[code]||'loading';},
+  watch(code){if(EVS[code]) return; EVS[code]='loading';
+    B.watch(code,ev=>{EV[code]=ev; EVS[code]=ev?'ok':'missing'; remoteRender();});},
+  load(code){this.watch(code); if(EVS[code]!=='loading') return Promise.resolve(EV[code]||null);
+    return new Promise(res=>{const t0=Date.now(), t=setInterval(()=>{if(EVS[code]!=='loading'||Date.now()-t0>10000){clearInterval(t); res(EV[code]||null);}},100);});},
+  setScore(code,pid,i,v){const ev=EV[code]; if(ev) (ev.scores[pid]||(ev.scores[pid]=Array(HOLES).fill(null)))[i]=v;
+    return B.setScore(code,pid,i,v).catch(()=>{toast='スコアを送れませんでした。電波の良い所でもう一度入力してください。'; render();});}
 };
+const netErr=()=>{toast='通信できませんでした。電波の良い所でもう一度お試しください。'; render();};
+
 const pName=(ev,pid)=>{const p=ev.players.find(x=>x.id===pid); return p?p.name:'?';};
 function groupOf(ev,pid){for(const g in ev.groups) if(ev.groups[g].members.includes(pid)) return g; return null;}
-function removeFromGroup(ev,pid){const g=groupOf(ev,pid); if(!g) return; const G=ev.groups[g]; G.members=G.members.filter(x=>x!==pid); if(!G.members.length) delete ev.groups[g];}
 const fmtD=d=>{const p=String(d||'').split('-'); return p.length===3?`${+p[1]}月${+p[2]}日`:'';};
-const shareUrl=code=>`https://hmsr16.github.io/golf#${code}`;
+const shareUrl=code=>`https://hmsr16.github.io/golf/#${code}`;
 const evTitle=ev=>ev.name||ev.course||'コンペ';
 
-let curEv=null, J={step:'code',code:'',msg:'',early:false,me:null,picks:[]}, galMsg='', galEarly=false, orgMsg='', grmAsk=null, ormAsk=null, rankOpen=null, regMsg='', regDel=false;
+let curEv=null, J={step:'code',code:'',msg:'',early:false,me:null,picks:[]}, galMsg='', galEarly=false, orgMsg='', grmAsk=null, ormAsk=null, rankOpen=null, regMsg='', regDel=false, busy=false;
+let REG=null, HIST=[], unsubH=null, regStep=null, regMail='', regLink='';
+
+// 登録の状態と履歴の読み込み
+B.auth.onChange(u=>{REG=u; if(unsubH){unsubH();unsubH=null;} HIST=[];
+  if(u) unsubH=B.history.watch(u.uid,list=>{HIST=list||[]; remoteRender();});
+  remoteRender();});
+// 確認メールのリンクから開いた時は、そのまま登録を済ませる
+if(B.auth.isLink(location.href)){regLink=location.href; regStep='sent'; L.view='hist';
+  try{history.replaceState(null,'',location.pathname);}catch(e){}
+  let m=''; try{m=localStorage.getItem('vegas-mail')||'';}catch(e){}
+  if(m){regMail=m; B.auth.completeLink(m,regLink).then(()=>{regStep=null; regLink=''; toast='登録できました。ホーム画面のアプリで使う場合は、アプリの中でも同じ手順で登録してください。'; render();}).catch(()=>{regMsg='リンクの期限が切れているか、すでに使われています。もう一度確認メールを送ってください。'; regStep=null; render();});}}
 
 // 共有中の組の名前・パー・スコアを、このスマホの表示に反映
 function syncLinked(){curEv=null; const lk=L.link; if(!lk) return;
-  const ev=Shared.get(lk.code);
+  const ev=Shared.get(lk.code), st=Shared.status(lk.code);
+  if(st==='loading') return;
   if(!ev){toast='共有の期限が切れたため、共有から外れました。このスマホのスコアは残っています。'; L.link=null; saveL(); return;}
   const G=ev.groups[lk.gid];
   if(!G||!G.members.includes(lk.pid)){toast='組から外れたため、共有をやめました。このスマホのスコアは残っています。'; L.link=null; saveL(); return;}
@@ -777,6 +835,7 @@ function syncLinked(){curEv=null; const lk=L.link; if(!lk) return;
   for(let k=0;k<4;k++){const pid=mem[k]; R0.setup.names[k]=pid?pName(ev,pid):'（空き）';}
   R0.holes.forEach((H,i)=>{H.par=ev.pars[i]; for(let k=0;k<4;k++){const pid=mem[k]; H.s[k]=pid&&ev.scores[pid]?(ev.scores[pid][i]??null):null;}});
   R0.setup.me=0; R0.setup.date=ev.date; R0.setup.course=evTitle(ev);
+  saveL();
 }
 function linkTo(ev,gid,pid){L.local={setup:defaultSetup(),holes:blankHoles()}; L.link={code:ev.code,pid,gid}; L.cur=0; L.pmode='code';
   J={step:'code',code:'',msg:'',early:false,me:null,picks:[]}; saveL(); toast=`${gid}組で参加しました。スコアは同じ組の人と共有されます。`; render();}
@@ -803,12 +862,15 @@ function rankHtml(rows,pars,meId){if(!rows.length) return '<div class="note">ま
 
 /* ---------- 役割の切り替え ---------- */
 function roleCard(){return `<section class="card"><div class="roles">${[['organizer','主催者'],['player','プレーヤー'],['gallery','ギャラリー']].map(([v,l])=>`<button class="rolebtn" data-role="${v}" aria-pressed="${L.role===v}">${l}</button>`).join('')}</div>
-  <div class="note demo">試し用：IDでの共有は、今はこのスマホの中だけで動きます（引っ越し後に本物の共有になります）。</div></section>`;}
+  ${IS_DEMO?'<div class="note demo">試し用：IDでの共有は、今はこのスマホの中だけで動きます（引っ越し後に本物の共有になります）。</div>':''}</section>`;}
 function evHead(ev){return `<div class="evhead"><b>${esc(evTitle(ev))}</b><span class="note">${fmtD(ev.date)}　${esc(ev.course||'')}　ID ${ev.code}</span></div>`;}
+const loadingCard=t=>`<section class="card"><div class="note">${t||'読み込み中…'}</div></section>`;
 
 /* ---------- 主催者 ---------- */
 function orgDraft(){if(!L.org) L.org={date:today(),name:'',course:'',pars:Array(HOLES).fill(4),names:''}; return L.org;}
 function orgNames(){return orgDraft().names.split('\n').map(s=>s.trim()).filter(Boolean);}
+// 発行したイベント（このスマホで発行したもの）。期限が過ぎたものは一覧から外す
+function myEvents(){const now=Date.now(); return (L.myEvents||[]).map(e=>typeof e==='string'?{code:e}:e).filter(e=>!e.end||now<=e.end);}
 function evCard(ev){const inG=new Set(Object.values(ev.groups).flatMap(G=>G.members)), rest=ev.players.filter(p=>!inG.has(p.id));
   const gs=Object.keys(ev.groups).sort((a,b)=>a-b);
   return `<section class="card issued">${evHead(ev)}
@@ -820,7 +882,7 @@ function evCard(ev){const inG=new Set(Object.values(ev.groups).flatMap(G=>G.memb
     ${ormAsk&&ormAsk.startsWith(ev.code+'|')?(()=>{const pid=ormAsk.split('|')[1]; return `<div class="confirm"><div><b>${esc(pName(ev,pid))}</b>さんを組から外しますか？ 入力済みのスコアは消えません。</div><div class="row"><button class="btn danger" id="ormYes">外す</button><button class="btn ghost" id="ormNo">やめる</button></div></div>`;})():''}
     ${rest.length?`<div class="note">まだ組に入っていない人：${rest.map(p=>esc(p.name)).join('・')}</div>`:''}
   </section>`;}
-function vOrg(){const o=orgDraft(), names=orgNames(), mine=(L.myEvents||[]).map(c=>Shared.get(c)).filter(Boolean);
+function vOrg(){const o=orgDraft(), names=orgNames(), mine=myEvents().map(e=>Shared.get(e.code)).filter(Boolean);
   return `${mine.map(evCard).join('')}
   <section class="card"><div class="label">新しいコンペを登録</div>
     <div class="label">開催日</div><input type="date" id="oDate" value="${esc(o.date)}">
@@ -832,18 +894,19 @@ function vOrg(){const o=orgDraft(), names=orgNames(), mine=(L.myEvents||[]).map(
     <textarea id="oNames" rows="8" placeholder="山田太郎&#10;鈴木花子">${esc(o.names)}</textarea>
     <div id="oCount" class="note${names.length>MAXP?' warnTxt':''}">${names.length}人${names.length>MAXP?'（40人までです）':''}</div>
     ${orgMsg?`<div class="toast warn">${esc(orgMsg)}</div>`:''}
-    <button class="btn" id="oIssue">IDを発行する</button>
+    <button class="btn" id="oIssue"${busy?' disabled':''}>${busy?'発行しています…':'IDを発行する'}</button>
     <div class="note">共有データは開催日の0時から48時間で自動的に消えます。プレーヤーとギャラリーは開催日から参加できます。</div>
   </section>`;}
 
 /* ---------- プレーヤー（IDで参加） ---------- */
 function vJoin(){
   if(J.step==='code') return `<section class="card"><div class="label">IDで参加</div>
-    <div class="coderow"><input type="text" id="joinCode" inputmode="numeric" maxlength="4" placeholder="イベントID" value="${esc(J.code)}"><button class="btn" id="joinGo">参加</button></div>
-    ${J.msg?`<div class="toast warn">${esc(J.msg)}</div>`:''}${J.early?`<button class="btn ghost" id="joinForce">試し用：今すぐ参加する</button>`:''}
+    <div class="coderow"><input type="text" id="joinCode" inputmode="numeric" maxlength="4" placeholder="イベントID" value="${esc(J.code)}"><button class="btn" id="joinGo"${busy?' disabled':''}>${busy?'確認中…':'参加'}</button></div>
+    ${J.msg?`<div class="toast warn">${esc(J.msg)}</div>`:''}${J.early&&IS_DEMO?`<button class="btn ghost" id="joinForce">試し用：今すぐ参加する</button>`:''}
     ${localHasScores()?'<div class="note">参加すると、今このスマホで入力中のスコアは新しいラウンドに切り替わります。</div>':''}
     <div class="or">または</div><button class="btn ghost" id="soloGo">単体で始める（共有しない）</button></section>`;
-  const ev=Shared.get(J.code); if(!ev){J={step:'code',code:'',msg:'IDが見つかりません。期限が切れた可能性があります。',early:false,me:null,picks:[]}; return vJoin();}
+  const ev=Shared.get(J.code);
+  if(!ev){if(Shared.status(J.code)==='loading') return loadingCard(); J={step:'code',code:'',msg:'IDが見つかりません。期限が切れた可能性があります。',early:false,me:null,picks:[]}; return vJoin();}
   const gl=p=>{const g=groupOf(ev,p.id); return g?`<small>${g}組（${esc(pName(ev,ev.groups[g].by))}が選択）</small>`:'';};
   if(J.step==='name') return `<section class="card">${evHead(ev)}<div class="label">自分の名前を選んでください</div>
     <div class="plist">${ev.players.map(p=>`<button class="pbtn" data-jme="${p.id}">${esc(p.name)}${gl(p)}</button>`).join('')}</div>
@@ -851,13 +914,13 @@ function vJoin(){
   if(J.step==='confirm'){const g=groupOf(ev,J.me); if(!g){J.step='pick';return vJoin();} const G=ev.groups[g];
     return `<section class="card">${evHead(ev)}<div class="ask"><b>${esc(pName(ev,J.me))}</b>さんは<b>${g}組</b>（${esc(pName(ev,G.by))}が選択）です。この組で参加しますか？</div>
       <div class="note">${g}組：${G.members.map(x=>esc(pName(ev,x))).join('・')}</div>
-      <div class="row"><button class="btn" id="jJoin">参加する</button><button class="btn danger" id="jWrong">違う組です</button></div>
+      <div class="row"><button class="btn" id="jJoin">参加する</button><button class="btn danger" id="jWrong"${busy?' disabled':''}>違う組です</button></div>
       <button class="btn ghost" id="joinBack">戻る</button></section>`;}
   return `<section class="card">${evHead(ev)}<div class="label">同じ組の人を選んでください（最大3人）</div>
     <div class="plist">${ev.players.filter(p=>p.id!==J.me).map(p=>{const g=groupOf(ev,p.id), on=J.picks.includes(p.id);
       return `<button class="pbtn${on?' on':''}" data-jpk="${p.id}" ${g?'disabled':''} aria-pressed="${on}">${esc(p.name)}${gl(p)}</button>`;}).join('')}</div>
     <div class="note">この組：${[J.me,...J.picks].map(x=>esc(pName(ev,x))).join('・')}</div>
-    <button class="btn" id="jStart">この組で始める</button><button class="btn ghost" id="joinBack">戻る</button></section>`;}
+    <button class="btn" id="jStart"${busy?' disabled':''}>${busy?'登録しています…':'この組で始める'}</button><button class="btn ghost" id="joinBack">戻る</button></section>`;}
 function vLinkedCard(){const ev=curEv, lk=L.link, G=ev.groups[lk.gid];
   return `<section class="card linked">${evHead(ev)}
     <div><b>${lk.gid}組</b>：${G.members.map(x=>esc(pName(ev,x))).join('・')}<span class="note">（${esc(pName(ev,G.by))}が選択）</span></div>
@@ -868,20 +931,29 @@ function vLinkedCard(){const ev=curEv, lk=L.link, G=ev.groups[lk.gid];
 
 /* ---------- ギャラリー ---------- */
 function vGallery(){const g=L.gal||{}, ev=g.code&&g.ok?Shared.get(g.code):null;
+  if(g.code&&g.ok&&!ev&&Shared.status(g.code)==='loading') return loadingCard();
   if(!ev) return `<section class="card"><div class="label">ギャラリー</div><div class="note">IDを入れると、コンペの順位表とスコアカードを見られます。</div>
     <div class="coderow"><input type="text" id="galCode" inputmode="numeric" maxlength="4" placeholder="イベントID" value="${esc(g.code||'')}"><button class="btn" id="galGo">見る</button></div>
-    ${galMsg?`<div class="toast warn">${esc(galMsg)}</div>`:''}${galEarly?`<button class="btn ghost" id="galForce">試し用：今すぐ見る</button>`:''}</section>`;
+    ${galMsg?`<div class="toast warn">${esc(galMsg)}</div>`:''}${galEarly&&IS_DEMO?`<button class="btn ghost" id="galForce">試し用：今すぐ見る</button>`:''}</section>`;
   return `<section class="card">${evHead(ev)}${rankHtml(rankRows(ev),ev.pars,null)}<button class="btn ghost" id="galOut">IDを入れ直す</button></section>`;}
 
 /* ---------- 登録（履歴を残す人だけ） ---------- */
 function regCard(){
-  if(!L.reg) return `<section class="card"><div class="regmsg">履歴を保存するにはメールアドレスの登録が必要です</div>
-    <input type="email" id="regMail" placeholder="メールアドレス" autocomplete="email">
-    <button class="btn" id="regSend">確認メールを送る</button>
+  if(!REG){
+    if(regStep==='sent') return `<section class="card"><div class="regmsg">確認メールを送りました</div>
+      <div class="note">${esc(regMail||'')} に届いたメールの中のリンクを<b>長押しして「リンクをコピー」</b>し、下に貼り付けて「登録する」を押してください。</div>
+      ${regMail?'':'<input type="email" id="regMail2" placeholder="メールアドレス" autocomplete="email">'}
+      <textarea id="regLinkIn" rows="3" placeholder="ここにリンクを貼り付け">${esc(regLink)}</textarea>
+      <button class="btn" id="regDone"${busy?' disabled':''}>登録する</button>
+      ${regMsg?`<div class="toast warn">${esc(regMsg)}</div>`:''}
+      <button class="btn ghost" id="regRetry">メールアドレスを入れ直す</button></section>`;
+    return `<section class="card"><div class="regmsg">履歴を保存するにはメールアドレスの登録が必要です</div>
+    <input type="email" id="regMail" placeholder="メールアドレス" autocomplete="email" value="${esc(regMail)}">
+    <button class="btn" id="regSend"${busy?' disabled':''}>確認メールを送る</button>
     <div class="or">または</div><button class="btn ghost" id="regGoogle">Googleでログイン</button>
     ${regMsg?`<div class="toast warn">${esc(regMsg)}</div>`:''}
-    <div class="note">アドレスは履歴の保存にだけ使います。試し用のため、今は確認メールは送られず、すぐに登録されます。</div></section>`;
-  return `<section class="card"><div class="row" style="justify-content:space-between"><div><div class="label">登録中</div><div>${esc(L.reg.label)}</div></div></div>
+    <div class="note">アドレスは履歴の保存にだけ使います。${IS_DEMO?'試し用のため、今は確認メールは送られず、すぐに登録されます。':''}</div></section>`;}
+  return `<section class="card"><div><div class="label">登録中</div><div>${esc(REG.label)}</div></div>
     ${regDel?`<div class="confirm"><div>登録をやめると、保存した履歴もすべて削除されます。元に戻せません。本当にやめますか？</div><div class="row"><button class="btn danger" id="regDelYes">やめて削除する</button><button class="btn ghost" id="regDelNo">戻る</button></div></div>`
       :`<button class="btn danger" id="regDel">登録をやめる（履歴も削除）</button>`}</section>`;}
 
@@ -893,67 +965,91 @@ function bindShared(){const $=id=>document.getElementById(id);
     $('oName').oninput=e=>{o.name=e.target.value;saveL();}; $('oCourse').oninput=e=>{o.course=e.target.value;saveL();};
     $('oNames').oninput=e=>{o.names=e.target.value;saveL(); const n=orgNames().length, c=$('oCount'); if(c){c.textContent=n+'人'+(n>MAXP?'（40人までです）':''); c.className='note'+(n>MAXP?' warnTxt':'');}};
     document.querySelectorAll('[data-op]').forEach(b=>b.onclick=()=>{const i=+b.dataset.op; o.pars[i]=o.pars[i]===4?5:o.pars[i]===5?3:4; saveL(); render();});
-    $('oIssue').onclick=()=>{const names=orgNames(); orgMsg='';
+    $('oIssue').onclick=async()=>{if(busy) return; const names=orgNames(); orgMsg='';
       if(!o.date) orgMsg='開催日を入れてください。'; else if(!o.course.trim()) orgMsg='ゴルフ場名を入れてください。';
       else if(names.length<2) orgMsg='参加者を2人以上入れてください。'; else if(names.length>MAXP) orgMsg='参加者は40人までです。';
       else if(new Set(names).size!==names.length) orgMsg='同じ名前が2回入っています。区別できるように名前を変えてください。';
+      else if(evEnd({date:o.date})<Date.now()) orgMsg='開催日が過ぎています。日付を確かめてください。';
       if(orgMsg){render();return;}
-      const ev=Shared.create({date:o.date,name:o.name.trim(),course:o.course.trim(),pars:o.pars,players:names});
-      L.myEvents=(L.myEvents||[]).concat([ev.code]); L.org=null; saveL(); toast=`ID「${ev.code}」を発行しました。`; render(); window.scrollTo(0,0);};}
+      busy=true; render();
+      try{const code=await B.createEvent({date:o.date,name:o.name.trim(),course:o.course.trim(),pars:o.pars,players:names});
+        L.myEvents=myEvents().concat([{code,end:evEnd({date:o.date}),n:names.length}]); L.org=null; saveL(); toast=`ID「${code}」を発行しました。`; window.scrollTo(0,0);}
+      catch(e){orgMsg='発行できませんでした。電波の良い所でもう一度お試しください。';}
+      busy=false; render();};}
   document.querySelectorAll('[data-orm]').forEach(b=>b.onclick=()=>{ormAsk=b.dataset.orm; render();});
   if($('ormNo')) $('ormNo').onclick=()=>{ormAsk=null;render();};
-  if($('ormYes')) $('ormYes').onclick=()=>{const [code,pid]=ormAsk.split('|'), ev=Shared.get(code); if(ev){removeFromGroup(ev,pid); Shared.put(ev);} ormAsk=null; render();};
+  if($('ormYes')) $('ormYes').onclick=()=>{const [code,pid]=ormAsk.split('|'); ormAsk=null; B.removeFromGroup(code,pid).catch(netErr); render();};
   document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{const t=b.dataset.copy;
     try{navigator.clipboard.writeText(t).then(()=>{toast='URLをコピーしました。LINEなどに貼り付けられます。';render();},()=>{toast='コピーできませんでした。URLを長押しして選んでください。';render();});}catch(e){toast='コピーできませんでした。URLを長押しして選んでください。';render();}});
   // プレーヤー
   if($('toJoin')) $('toJoin').onclick=()=>{L.pmode='code'; saveL(); render();};
   if($('soloGo')) $('soloGo').onclick=()=>{L.pmode='solo'; saveL(); render();};
-  if($('joinGo')) $('joinGo').onclick=()=>{const c=($('joinCode').value||'').replace(/\D/g,''); J.code=c; J.msg=''; J.early=false;
-    const ev=Shared.get(c); if(!ev){J.msg='IDが見つかりません。数字を確かめてください。'; render(); return;}
+  if($('joinGo')) $('joinGo').onclick=async()=>{if(busy) return; const c=($('joinCode').value||'').replace(/\D/g,''); J.code=c; J.msg=''; J.early=false;
+    if(c.length!==4){J.msg='イベントIDを確かめてください。'; render(); return;}
+    busy=true; render(); const ev=await Shared.load(c); busy=false;
+    if(!ev){J.msg='IDが見つかりません。数字を確かめてください。'; render(); return;}
     if(Date.now()<evStart(ev)){J.msg=`このコンペは${fmtD(ev.date)}から参加できます。`; J.early=true; render(); return;}
     J.step='name'; render();};
   if($('joinForce')) $('joinForce').onclick=()=>{J.msg='';J.early=false;J.step='name';render();};
   if($('joinBack')) $('joinBack').onclick=()=>{J.step=J.step==='name'?'code':'name'; J.picks=[]; render();};
   document.querySelectorAll('[data-jme]').forEach(b=>b.onclick=()=>{const ev=Shared.get(J.code); J.me=b.dataset.jme; J.picks=[]; J.step=ev&&groupOf(ev,J.me)?'confirm':'pick'; render();});
   if($('jJoin')) $('jJoin').onclick=()=>{const ev=Shared.get(J.code), g=ev&&groupOf(ev,J.me); if(g) linkTo(ev,g,J.me);};
-  if($('jWrong')) $('jWrong').onclick=()=>{const ev=Shared.get(J.code); if(ev){removeFromGroup(ev,J.me); Shared.put(ev);} J.step='pick'; J.picks=[]; render();};
+  if($('jWrong')) $('jWrong').onclick=async()=>{busy=true; render(); try{await B.removeFromGroup(J.code,J.me); J.step='pick'; J.picks=[];}catch(e){netErr();} busy=false; render();};
   document.querySelectorAll('[data-jpk]').forEach(b=>b.onclick=()=>{const p=b.dataset.jpk;
     if(J.picks.includes(p)) J.picks=J.picks.filter(x=>x!==p); else if(J.picks.length<3) J.picks.push(p); else toast='同じ組に選べるのは3人までです。'; render();});
-  if($('jStart')) $('jStart').onclick=()=>{const ev=Shared.get(J.code); if(!ev) return;
-    if(groupOf(ev,J.me)){J.step='confirm';render();return;}
-    const taken=J.picks.filter(p=>groupOf(ev,p)); if(taken.length){toast=`${taken.map(p=>pName(ev,p)).join('・')}さんは、ほかの組に選ばれました。選び直してください。`; J.picks=J.picks.filter(p=>!taken.includes(p)); render(); return;}
-    const gid=String(Math.max(0,...Object.keys(ev.groups).map(Number))+1); ev.groups[gid]={by:J.me,members:[J.me,...J.picks]}; Shared.put(ev); linkTo(ev,gid,J.me);};
+  if($('jStart')) $('jStart').onclick=async()=>{if(busy) return; busy=true; render(); let res=null;
+    try{res=await B.createGroup(J.code,J.me,J.picks);}catch(e){busy=false; netErr(); return;}
+    busy=false; const ev=await Shared.load(J.code);
+    if(!res||res.missing||!ev){J={step:'code',code:'',msg:'IDが見つかりません。期限が切れた可能性があります。',early:false,me:null,picks:[]}; render(); return;}
+    if(res.already){J.step='confirm'; render(); return;}
+    if(res.taken){toast=`${res.taken.map(p=>pName(ev,p)).join('・')}さんは、ほかの組に選ばれました。選び直してください。`; J.picks=J.picks.filter(p=>!res.taken.includes(p)); render(); return;}
+    linkTo(ev,res.gid,J.me);};
   document.querySelectorAll('[data-grm]').forEach(b=>b.onclick=()=>{grmAsk=b.dataset.grm; render();});
   if($('leaveGrp')) $('leaveGrp').onclick=()=>{grmAsk='self'; render();};
   if($('grmNo')) $('grmNo').onclick=()=>{grmAsk=null;render();};
-  if($('grmYes')) $('grmYes').onclick=()=>{const ev=Shared.get(L.link.code);
-    if(ev){removeFromGroup(ev,grmAsk==='self'?L.link.pid:grmAsk); Shared.put(ev);}
+  if($('grmYes')) $('grmYes').onclick=()=>{const who=grmAsk==='self'?L.link.pid:grmAsk, code=L.link.code;
+    B.removeFromGroup(code,who).catch(netErr);
     if(grmAsk==='self'){L.link=null; L.pmode='code'; saveL(); toast='組から抜けました。';} grmAsk=null; render();};
   // ギャラリー
-  if($('galGo')) $('galGo').onclick=()=>{const c=($('galCode').value||'').replace(/\D/g,''); galMsg=''; galEarly=false; L.gal={code:c,ok:false};
-    const ev=Shared.get(c); if(!ev) galMsg='IDが見つかりません。数字を確かめてください。';
+  if($('galGo')) $('galGo').onclick=async()=>{const c=($('galCode').value||'').replace(/\D/g,''); galMsg=''; galEarly=false; L.gal={code:c,ok:false};
+    const ev=c.length===4?await Shared.load(c):null; if(!ev) galMsg='IDが見つかりません。数字を確かめてください。';
     else if(Date.now()<evStart(ev)){galMsg=`このコンペは${fmtD(ev.date)}から見られます。`; galEarly=true;} else L.gal.ok=true;
     saveL(); render();};
   if($('galForce')) $('galForce').onclick=()=>{L.gal.ok=true; galMsg=''; galEarly=false; saveL(); render();};
   if($('galOut')) $('galOut').onclick=()=>{L.gal={code:'',ok:false}; rankOpen=null; saveL(); render();};
   document.querySelectorAll('[data-rk]').forEach(b=>b.onclick=()=>{rankOpen=rankOpen===b.dataset.rk?null:b.dataset.rk; render();});
   // 登録
-  if($('regSend')) $('regSend').onclick=()=>{const m=($('regMail').value||'').trim();
+  const okReg=()=>{regMsg=''; regStep=null; regLink=''; toast='登録しました。これから保存するラウンドは履歴に残ります。'; render();};
+  if($('regSend')) $('regSend').onclick=async()=>{const m=($('regMail').value||'').trim(); regMail=m;
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(m)){regMsg='メールアドレスを確かめてください。'; render(); return;}
-    L.reg={method:'email',label:m}; regMsg=''; saveL(); toast='登録しました。これから保存するラウンドは履歴に残ります。'; render();};
-  if($('regGoogle')) $('regGoogle').onclick=()=>{L.reg={method:'google',label:'Googleアカウント（試し用）'}; regMsg=''; saveL(); toast='登録しました。これから保存するラウンドは履歴に残ります。'; render();};
+    busy=true; render();
+    try{await B.auth.sendLink(m); regMsg=''; if(B.auth.instant) okReg(); else {regStep='sent'; render();}}
+    catch(e){regMsg='確認メールを送れませんでした。アドレスを確かめて、もう一度お試しください。'; render();}
+    busy=false; render();};
+  if($('regDone')) $('regDone').onclick=async()=>{const link=($('regLinkIn').value||'').trim(), m=regMail||(($('regMail2')||{}).value||'').trim();
+    if(!B.auth.isLink(link)){regMsg='貼り付けたリンクを確かめてください。メールの中のリンクを長押ししてコピーします。'; regLink=link; render(); return;}
+    if(!m){regMsg='メールアドレスを入れてください。'; regLink=link; render(); return;}
+    busy=true; render(); try{await B.auth.completeLink(m,link); busy=false; okReg();}catch(e){busy=false; regMsg='登録できませんでした。リンクの期限が切れているか、すでに使われています。もう一度確認メールを送ってください。'; render();}};
+  if($('regRetry')) $('regRetry').onclick=()=>{regStep=null; regMsg=''; regLink=''; render();};
+  if($('regGoogle')) $('regGoogle').onclick=async()=>{try{await B.auth.google(); okReg();}catch(e){regMsg='Googleでログインできませんでした。メールアドレスで登録してください。'; render();}};
   if($('regDel')) $('regDel').onclick=()=>{regDel=true;render();};
   if($('regDelNo')) $('regDelNo').onclick=()=>{regDel=false;render();};
-  if($('regDelYes')) $('regDelYes').onclick=()=>{L.reg=null; L.history=[]; regDel=false; histOpen=null; saveL(); toast='登録をやめて、履歴を削除しました。'; render();};
+  if($('regDelYes')) $('regDelYes').onclick=async()=>{regDel=false; histOpen=null; const uid=REG&&REG.uid;
+    let r=null; try{r=await B.auth.deleteAccount(uid);}catch(e){}
+    toast=r&&r.ok?'登録をやめて、履歴を削除しました。':(r&&r.relogin?'履歴は削除しました。登録の取り消しを終えるには、もう一度ログインしてから「登録をやめる」を押してください。':'削除できませんでした。電波の良い所でもう一度お試しください。'); render();};
   if($('regGo')) $('regGo').onclick=()=>{endStep=null; setTab('hist');};
 }
+// このスマホで発行したイベントのうち、期限が過ぎたものを共有データから消す
+setTimeout(()=>{const now=Date.now(), old=(L.myEvents||[]).filter(e=>typeof e==='object'&&e.end&&now>e.end);
+  old.forEach(e=>B.cleanup(e.code,e.n||MAXP).catch(()=>{}));
+  if(old.length){L.myEvents=myEvents(); saveL();}},3000);
 
 function vSetupAll(){
   if(L.role==='organizer') return roleCard()+vOrg();
   if(L.role==='gallery') return roleCard()+vGallery();
   if(!L.link&&L.pmode!=='solo') return roleCard()+vJoin();
-  return roleCard()+(L.link&&curEv?vLinkedCard():`<section class="card"><button class="btn ghost" id="toJoin">IDで参加する</button></section>`)+vSetup();}
-function vHist(){if(!L.reg) return regCard(); return vHistInner()+(histOpen?'':regCard());}
+  return roleCard()+(L.link?(curEv?vLinkedCard():loadingCard('共有データを読み込み中…')):`<section class="card"><button class="btn ghost" id="toJoin">IDで参加する</button></section>`)+vSetup();}
+function vHist(){if(!REG) return regCard(); return vHistInner()+(histOpen?'':regCard());}
 
 function mpSet(f){const mp=clone(R.setup.mp); f(mp); mutate(r=>r.setup.mp=clone(mp),{setup:{mp}});}
 function bindMp(){const $=id=>document.getElementById(id);
@@ -1041,8 +1137,7 @@ function bind(){
     if($('delBtn')) $('delBtn').onclick=()=>{histDel=histOpen;render();};
     if($('delNo')) $('delNo').onclick=()=>{histDel=null;render();};
     if($('delYes')) $('delYes').onclick=async()=>{const rec=allHistory().find(h=>h.id===histOpen);
-      if(rec){ if(rec._local){L.history=L.history.filter(h=>h.id!==rec.id);saveL();}
-        else{try{await db.collection('data/users/'+myId).doc(rec.id).delete();}catch(e){toast='削除できませんでした。';}}}
+      if(rec&&REG){try{await B.history.del(REG.uid,rec.id);}catch(e){toast='削除できませんでした。';}}
       histOpen=null;histDel=null;if(!toast)toast='記録を削除しました。';render();};
     if($('copyBtn')) $('copyBtn').onclick=()=>{const ta=$('copyText'),txt=ta.value;
       const fb=()=>{ta.hidden=false;ta.select();toast='文字を選択しました。長押しでコピーしてください。';render();};
