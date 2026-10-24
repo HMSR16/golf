@@ -224,6 +224,9 @@ table.lvt :is(th,td):not(:first-child){padding-left:2px;padding-right:2px}
 table.lvt thead th:not(:first-child){font-size:13px;line-height:1.25;vertical-align:bottom}
 table.lvt .nmfit{display:block;white-space:nowrap;overflow:hidden}
 tr.total td{font-weight:700;border-top:2px solid var(--fg)}
+tr.total td:first-child{font-size:12px;line-height:1.3}
+tr.total td.num{font-size:30px;font-weight:800;line-height:1.1;padding-top:10px;padding-bottom:10px}
+tr.namerow td{color:var(--muted);font-weight:700;vertical-align:bottom;padding-top:12px}
 .pos{color:var(--teamA)} .neg{color:var(--teamB)}
 .parh{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px 12px;padding:2px 0 6px}
 .mini-step{display:flex;align-items:center;gap:4px;font-size:12.5px;color:var(--muted)}
@@ -792,7 +795,8 @@ function sumTable(clickable){
       rows.push(`<tr class="sub"><td>${i===8?'前半計':'後半計'}</td>${[0,1,2,3].map(k=>`<td><div class="num ${s.tot[k]>0?'pos':s.tot[k]<0?'neg':''}">${sign(s.tot[k])}</div><div class="sc">${s.gro[k]||'–'}</div></td>`).join('')}</tr>`);}}
   return `<div class="tablewrap"><table class="lvt ${R.setup.me!=null?'mc'+R.setup.me:''}"><thead><tr><th>ホール</th>${[0,1,2,3].map(k=>`<th class="${R.setup.me===k?'meh':''}"><span class="nmfit">${esc(N(k))}</span></th>`).join('')}</tr></thead>
   <tbody>${rows.join('')}
-  <tr class="total"><td>ポイント</td>${t.tot.map(v=>`<td class="num ${v>0?'pos':v<0?'neg':''}">${sign(v)}</td>`).join('')}</tr>
+  <tr class="namerow"><td></td>${[0,1,2,3].map(k=>`<td><span class="nmfit">${esc(N(k))}</span></td>`).join('')}</tr>
+  <tr class="total"><td>トータル<br>ポイント</td>${t.tot.map(v=>`<td class="num ${v>0?'pos':v<0?'neg':''}">${sign(v)}</td>`).join('')}</tr>
   <tr><td>勝敗</td>${[0,1,2,3].map(k=>`<td><div class="wl"><span class="pos">${t.w[k]}勝</span><span class="neg">${t.l[k]}敗</span><span class="note">${t.d[k]}分</span></div></td>`).join('')}</tr>
   <tr><td>スコア</td>${t.gro.map(v=>`<td class="num">${v||'–'}</td>`).join('')}</tr>
   <tr><td>ハンデ</td>${t.hc.map(v=>`<td class="num">${v}</td>`).join('')}</tr>
