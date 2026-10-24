@@ -790,7 +790,7 @@ function sumTable(clickable){
       return `<td>${pt}<div class="sc">${g==null?'–':g}${h?`<span class="hc">H${h}</span>`:''}</div></td>`;}).join('')}</tr>`);
     if(i===8||i===17){const a=i===8?0:9, s=halfTotals(a,i);
       rows.push(`<tr class="sub"><td>${i===8?'前半計':'後半計'}</td>${[0,1,2,3].map(k=>`<td><div class="num ${s.tot[k]>0?'pos':s.tot[k]<0?'neg':''}">${sign(s.tot[k])}</div><div class="sc">${s.gro[k]||'–'}</div></td>`).join('')}</tr>`);}}
-  return `<div class="tablewrap"><table class="lvt ${R.setup.me!=null?'mc'+R.setup.me:''}"><thead><tr><th>ホール</th>${[0,1,2,3].map(k=>`<th class="${R.setup.me===k?'meh':''}">${R.setup.me===k?'<span class="mytag">自分</span><br>':''}<span class="nmfit">${esc(N(k))}</span></th>`).join('')}</tr></thead>
+  return `<div class="tablewrap"><table class="lvt ${R.setup.me!=null?'mc'+R.setup.me:''}"><thead><tr><th>ホール</th>${[0,1,2,3].map(k=>`<th class="${R.setup.me===k?'meh':''}"><span class="nmfit">${esc(N(k))}</span></th>`).join('')}</tr></thead>
   <tbody>${rows.join('')}
   <tr class="total"><td>ポイント</td>${t.tot.map(v=>`<td class="num ${v>0?'pos':v<0?'neg':''}">${sign(v)}</td>`).join('')}</tr>
   <tr><td>勝敗</td>${[0,1,2,3].map(k=>`<td><div class="wl"><span class="pos">${t.w[k]}勝</span><span class="neg">${t.l[k]}敗</span><span class="note">${t.d[k]}分</span></div></td>`).join('')}</tr>
