@@ -619,7 +619,7 @@ function endCard(){
     <div class="endrow${ended?' noback':''}"><button class="btn danger" id="discardEnd">保存しない</button>${REG?'<button class="btn big" id="saveEnd">保存して終了</button>':'<button class="btn big" id="regGo">登録して保存する</button>'}${ended?'':`<button class="btn ghost" id="endBack">戻る</button>`}</div></section>`;
 }
 function hcpBlock(s,h){const T=h?s.hcp2:s.hcp, P=h?s.hcpPar2:s.hcpPar;
-  return `<div class="hcpgrid">${[0,1,2,3].map(k=>`<div class="hcpp"><div class="hname">${esc(N(k))}</div><div class="chips" data-hcp="${k}" data-half="${h}">${[['none','なし'],['all1','オール1'],['par','パー別'],['hole','ホール別']].map(([v,l])=>`<button class="chip" data-hv="${v}" aria-pressed="${T[k]===v}">${l}</button>`).join('')}</div>${T[k]==='par'?`<div class="parh">${[3,4,5].map(p=>`<div class="mini-step"><span>パー${p}</span><button data-pk="${k}" data-pp="${p}" data-half="${h}" data-d="-1" aria-label="パー${p}のハンデを減らす">−</button><b>${P[k][p]}</b><button data-pk="${k}" data-pp="${p}" data-half="${h}" data-d="1" aria-label="パー${p}のハンデを増やす">＋</button></div>`).join('')}</div>`:''}</div>`).join('')}</div>`;}
+  return `<div class="hcpgrid">${[0,1,2,3].map(k=>`<div class="hcpp"><div class="hname">${esc(N(k))}</div><div class="chips" data-hcp="${k}" data-half="${h}">${[['none','なし'],['all1','オール1'],['par','パー別'],['hole','ホールごと']].map(([v,l])=>`<button class="chip" data-hv="${v}" aria-pressed="${T[k]===v}">${l}</button>`).join('')}</div>${T[k]==='par'?`<div class="parh">${[3,4,5].map(p=>`<div class="mini-step"><span>パー${p}</span><button data-pk="${k}" data-pp="${p}" data-half="${h}" data-d="-1" aria-label="パー${p}のハンデを減らす">−</button><b>${P[k][p]}</b><button data-pk="${k}" data-pp="${p}" data-half="${h}" data-d="1" aria-label="パー${p}のハンデを増やす">＋</button></div>`).join('')}</div>`:''}</div>`).join('')}</div>`;}
 // ラスベガス・マッチプレーを「する／しない」
 function onOff(kind,on){const nm=kind==='lv'?'ラスベガス':'マッチプレー';
   return `<section class="card"><div class="label">${nm}を</div><div class="chips onoff" id="${kind}On"><button class="chip" data-on="1" aria-pressed="${on}">する</button><button class="chip" data-on="0" aria-pressed="${!on}">しない</button></div>
@@ -661,7 +661,7 @@ function vSetup(){
     ${s.split?`<div class="half">前半（1〜9H）</div>`:''}
     ${hcpBlock(s,0)}
     ${s.split?`<div class="half">後半（10〜18H）</div>${hcpBlock(s,1)}`:''}
-    <div class="note">前半・後半で分けると、10H目から後半のハンデに切り替わります（途中で変えても大丈夫です）。オール1：全ホールで1打引く。パー別：パー3・4・5ごとに引く打数を決める。ホール別：スコア画面でホールごとに＋−で入れる。ハンデを引いてもパーより良くはなりません。</div>
+    <div class="note">前半・後半で分けると、10H目から後半のハンデに切り替わります（途中で変えても大丈夫です）。オール1：全ホールで1打引く。パー別：パー3・4・5ごとに引く打数を決める。ホールごと：スコア画面でホールごとに＋−で入れる。ハンデを引いてもパーより良くはなりません。</div>
   </section>`:''}`:''}
   <button class="btn ${s.mpSeen?'ghost':'ordbtn'} secbtn" id="mpToggle" aria-expanded="${mpOpen}">マッチプレー<span>${mpOpen?'閉じる ▲':(s.mpOn?'する':'しない')+'・設定 ▼'}</span></button>
   ${mpOpen?onOff('mp',s.mpOn)+(s.mpOn?mpSetupCard(s):''):''}
