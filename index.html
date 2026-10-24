@@ -141,6 +141,10 @@ tr.sub td:first-child{color:var(--accent)}
 .ask{font-size:17px}
 .card.linked{border:2px solid var(--accent)}
 .bigcode{font-family:var(--font-num);font-size:56px;font-weight:700;letter-spacing:.2em;text-align:center;color:var(--accent);line-height:1}
+.endrow{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:stretch;margin-top:10px}
+.endrow.noback{grid-template-columns:auto 1fr}
+.btn.big{font-size:17px;padding-top:14px;padding-bottom:14px}
+.joinask{display:grid;gap:10px;margin-top:10px}
 .copyset{display:grid;gap:8px;margin:8px 0 4px}
 .urlrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .url{font-family:var(--font-num);font-size:16px;word-break:break-all;-webkit-user-select:all;user-select:all;min-width:0;flex:1 1 200px}
@@ -609,7 +613,7 @@ function endCard(){
     <div class="note">${ended?'今画面に出ているスコアを、あなたの履歴に保存できます。'
       :shared?(isHost()?'あなたはホストなので、終了するとみんなの画面の共有データも消えます。各自が保存した履歴は残ります。':'あなたのスマホだけがラウンドから外れます。ほかの人の画面はそのままです。')
       :'保存すると「履歴」タブにいつでも見られる形で残ります。'}${REG?'':'<br>履歴に残すにはメールアドレスの登録が必要です。「登録して保存する」を押すと登録画面に移ります（入力中のスコアはそのまま残ります）。'}</div>
-    <div class="row">${REG?'<button class="btn" id="saveEnd">保存して終了</button>':'<button class="btn" id="regGo">登録して保存する</button>'}<button class="btn danger" id="discardEnd">保存しない</button>${ended?'':`<button class="btn ghost" id="endBack">やめる</button>`}</div></section>`;
+    <div class="endrow${ended?' noback':''}"><button class="btn danger" id="discardEnd">保存しない</button>${REG?'<button class="btn big" id="saveEnd">保存して終了</button>':'<button class="btn big" id="regGo">登録して保存する</button>'}${ended?'':`<button class="btn ghost" id="endBack">戻る</button>`}</div></section>`;
 }
 function hcpBlock(s,h){const T=h?s.hcp2:s.hcp, P=h?s.hcpPar2:s.hcpPar;
   return `<div class="hcpgrid">${[0,1,2,3].map(k=>`<div>${esc(N(k))}</div><div class="chips" data-hcp="${k}" data-half="${h}">${[['none','なし'],['all1','オール1'],['par','パー別'],['hole','ホール毎']].map(([v,l])=>`<button class="chip" data-hv="${v}" aria-pressed="${T[k]===v}">${l}</button>`).join('')}</div>${T[k]==='par'?`<div class="parh">${[3,4,5].map(p=>`<div class="mini-step"><span>パー${p}</span><button data-pk="${k}" data-pp="${p}" data-half="${h}" data-d="-1" aria-label="パー${p}のハンデを減らす">−</button><b>${P[k][p]}</b><button data-pk="${k}" data-pp="${p}" data-half="${h}" data-d="1" aria-label="パー${p}のハンデを増やす">＋</button></div>`).join('')}</div>`:''}`).join('')}</div>`;}
@@ -775,7 +779,7 @@ function sumTable(clickable){
   <div class="note">各マスは上がポイント、下が実際のスコア（H＝実際に引いたハンデ。パーより良くはならないので、設定より少ないことがあります）。×は倍率、越は持ち越し。${clickable?'ホールのボタンを押すと、そのホールのスコア画面を開きます。':''}</div>`;
 }
 function vSum(){const hd=(t,sub)=>`<h2 class="sumhead">${t}${sub?`<small>${esc(sub)}</small>`:''}</h2>`;
-  return `${R.setup.lvOn?`${hd('ラスベガス',R.setup.course)}<section class="card">${sumTable(true)}</section>`:''}${hd('スコアカード','同組')}<section class="card">${scoreCards()}</section>${mpMatches().length?`${hd('マッチプレー')}<section class="card">${mpSummary(false)}</section>`:''}${L.link&&curEv?`${hd('順位表','Gross')}<section class="card">${rankHtml(rankRows(curEv),curEv.pars,L.link.pid)}</section>`:''}`;}
+  return `${R.setup.lvOn?`${hd('ラスベガス',R.setup.course)}<section class="card">${sumTable(true)}</section>`:''}${hd('スコアカード','同組')}<section class="card">${scoreCards()}</section>${mpMatches().length?`${hd('マッチプレー')}<section class="card">${mpSummary(false)}</section>`:''}${L.link&&curEv?`${hd('順位表','Gross')}<section class="card">${rankHtml(rankRows(curEv),curEv.pars,L.link.pid)}</section>`:''}<div id="roundArea">${roundCard()}</div>`;}
 function vHistInner(){
   const list=allHistory();
   if(histOpen){const rec=list.find(h=>h.id===histOpen); if(!rec){histOpen=null;return vHist();}
@@ -791,7 +795,7 @@ function vHistInner(){
       ${histDel===rec.id?`<div class="confirm"><div>この記録を削除します。元に戻せません。本当に削除しますか？</div><div class="row"><button class="btn danger" id="delYes">削除する</button><button class="btn ghost" id="delNo">やめる</button></div></div>`
         :`<button class="btn danger" id="delBtn">この記録を削除</button>`}
     </section>`);}
-  if(!list.length) return `<section class="card"><div class="label">履歴</div><div class="note">保存したラウンドはまだありません。ラウンドが終わったら「設定」の「ラウンドを終了する」から保存すると、ここに並びます。</div></section>`;
+  if(!list.length) return `<section class="card"><div class="label">履歴</div><div class="note">保存したラウンドはまだありません。ラウンドが終わったら「設定」か「集計」の「ラウンドを終了する」から保存すると、ここに並びます。</div></section>`;
   return `<section class="card"><div class="label">履歴（保存したラウンド）</div><div class="opt">${list.map(h=>{
     const names=(h.setup&&h.setup.names)||[];
     return `<button class="joinitem" data-hist="${esc(h.id)}"><b>${esc(h.date)}　${esc(h.setup.course||'')}</b><span>${names.map((n,k)=>h.setup.lvOn===false?((h.gro||[])[k]?`${esc(n)} ${(h.gro||[])[k]}`:''):`${esc(n)} ${sign((h.tot||[])[k]||0)}`).filter(Boolean).join('　')}</span></button>`;}).join('')}</div>
@@ -999,7 +1003,6 @@ function vJoin(){
   if(J.step==='code') return `<section class="card"><div class="label">IDで参加</div>
     <div class="coderow"><input type="text" id="joinCode" inputmode="numeric" maxlength="4" placeholder="イベントID" value="${esc(J.code)}"><button class="btn" id="joinGo"${busy?' disabled':''}>${busy?'確認中…':'参加'}</button></div>
     ${J.msg?`<div class="toast warn">${esc(J.msg)}</div>`:''}${J.early&&IS_DEMO?`<button class="btn ghost" id="joinForce">試し用：今すぐ参加する</button>`:''}
-    ${localHasScores()?'<div class="note">参加すると、今このスマホで入力中のスコアは新しいラウンドに切り替わります。</div>':''}
     <div class="or">または</div><button class="btn ghost" id="soloGo">単体で始める（共有しない）</button></section>`;
   const ev=Shared.get(J.code);
   if(!ev){if(Shared.status(J.code)==='loading') return loadingCard(); J={step:'code',code:'',msg:'IDが見つかりません。期限が切れた可能性があります。',early:false,me:null,picks:[]}; return vJoin();}
@@ -1014,7 +1017,11 @@ function vJoin(){
   const G=ev.groups[g];
   return `<section class="card">${evHead(ev)}<div class="ask"><b>${esc(pName(ev,J.me))}</b>さんは<b>${g}組</b>です。この組で参加しますか？</div>
     <div class="note">${g}組：${G.members.map(x=>esc(pName(ev,x))).join('・')}</div>
-    <button class="btn" id="jJoin">参加する</button>
+    ${J.ask?`<div class="confirm joinask"><div><b>入力中のスコアがあります。</b></div>
+      ${REG?'':'<div class="note">保存するにはメールアドレスの登録が必要です。「登録して保存」を押すと登録画面に移ります（入力中のスコアはそのまま残ります）。</div>'}
+      <button class="btn big" id="${REG?'jSaveJoin':'jRegGo'}">${REG?'保存して参加':'登録して保存'}</button>
+      <div class="row"><button class="btn danger" id="jNoSaveJoin">保存せずに参加</button><button class="btn ghost" id="jAskBack">戻る</button></div></div>`
+    :`<button class="btn" id="jJoin">参加する</button>`}
     <div class="note">組が違う場合は、主催者に伝えてください。</div>
     <button class="btn ghost" id="joinBack">戻る</button></section>`;}
 function vLinkedCard(){const ev=curEv, lk=L.link, G=ev.groups[lk.gid];
@@ -1122,7 +1129,12 @@ function bindShared(){const $=id=>document.getElementById(id);
   if($('joinForce')) $('joinForce').onclick=()=>{J.msg='';J.early=false;J.step='name';render();};
   if($('joinBack')) $('joinBack').onclick=()=>{J.step=J.step==='name'?'code':'name'; render();};
   document.querySelectorAll('[data-jme]').forEach(b=>b.onclick=()=>{J.me=b.dataset.jme; J.picks=[]; J.step='confirm'; render();});
-  if($('jJoin')) $('jJoin').onclick=()=>{const ev=Shared.get(J.code), g=ev&&groupOf(ev,J.me); if(g) linkTo(ev,g,J.me);};
+  const jGo=()=>{const ev=Shared.get(J.code), g=ev&&groupOf(ev,J.me); J.ask=false; if(g) linkTo(ev,g,J.me);};
+  if($('jJoin')) $('jJoin').onclick=()=>{if(localHasScores()){J.ask=true; render();} else jGo();};
+  if($('jAskBack')) $('jAskBack').onclick=()=>{J.ask=false; render();};
+  if($('jNoSaveJoin')) $('jNoSaveJoin').onclick=jGo;
+  if($('jRegGo')) $('jRegGo').onclick=()=>setTab('hist');
+  if($('jSaveJoin')) $('jSaveJoin').onclick=async()=>{R=L.local; if(await saveHistory()){jGo(); toast='入力中のスコアを履歴に保存して参加しました。'; render();} else render();};
   if($('jWrong')) $('jWrong').onclick=async()=>{busy=true; render(); try{await B.removeFromGroup(J.code,J.me); J.step='pick'; J.picks=[];}catch(e){netErr();} busy=false; render();};
   document.querySelectorAll('[data-jpk]').forEach(b=>b.onclick=()=>{const p=b.dataset.jpk;
     if(J.picks.includes(p)) J.picks=J.picks.filter(x=>x!==p); else if(J.picks.length<3) J.picks.push(p); else toast='同じ組に選べるのは3人までです。'; render();});
@@ -1226,7 +1238,7 @@ function vHelp(){
     <p>履歴を残すのと、主催者としてIDを発行するには、メールアドレスの登録が必要です（「履歴」タブから）。</p>
     <p>登録は、<b>ホーム画面のアイコンから開いたアプリ</b>で行ってください。iPhoneでは、確認メールのリンクを<b>押さずに長押しでコピー</b>して、アプリに貼り付けます。</p>
     <p>登録すると、機種変更しても同じアドレスで履歴を見られます。</p>
-    <p>ラウンドが終わったら、設定画面の一番下「ラウンドを終了する」→「保存して終了」。</p>`)}
+    <p>ラウンドが終わったら、設定か集計の一番下「ラウンドを終了する」→「保存して終了」。</p>`)}
   ${sec('7. よくある質問',`
     <dl class="faq">
       <dt>途中でアプリを閉じてしまった</dt><dd>IDで参加中なら、もう一度IDを入れて自分の名前を選べば続きから入力できる。</dd>
@@ -1267,14 +1279,14 @@ function bind(){
   bindShared();
   if($('helpBack')) $('helpBack').onclick=()=>{L.view=helpFrom||'setup'; saveL(); render(); window.scrollTo(0,0);};
   if(toast){const t=toast; setTimeout(()=>{if(toast===t){toast='';render();}},4000);}
+  if($('endBtn')) $('endBtn').onclick=()=>{endStep='ask';render();const a=$('roundArea');if(a)a.scrollIntoView({block:'end'});};
+  if($('endBack')) $('endBack').onclick=()=>{endStep=null;render();};
+  if($('saveEnd')) $('saveEnd').onclick=()=>finishRound(true);
+  if($('discardEnd')) $('discardEnd').onclick=()=>{endStep='discard';render();};
+  if($('discardYes')) $('discardYes').onclick=()=>finishRound(false);
   if(L.view==='setup'){
     if($('shareBtn')) $('shareBtn').onclick=createShared;
     document.querySelectorAll('[data-join]').forEach(b=>b.onclick=()=>joinRound(b.dataset.join));
-    if($('endBtn')) $('endBtn').onclick=()=>{endStep='ask';render();const a=$('roundArea');if(a)a.scrollIntoView({block:'end'});};
-    if($('endBack')) $('endBack').onclick=()=>{endStep=null;render();};
-    if($('saveEnd')) $('saveEnd').onclick=()=>finishRound(true);
-    if($('discardEnd')) $('discardEnd').onclick=()=>{endStep='discard';render();};
-    if($('discardYes')) $('discardYes').onclick=()=>finishRound(false);
     if(!$('course')) return;
     $('rdate').onchange=e=>{const v=e.target.value||''; mutate(r=>r.setup.date=v,{setup:{date:v}});};
     $('course').onchange=e=>mutate(r=>r.setup.course=e.target.value,{setup:{course:e.target.value}});
