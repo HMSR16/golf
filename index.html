@@ -41,7 +41,7 @@
   --accent:#5cc28c; --accent-soft:#1f3328; --mine:#3d3417; --teamA:#6ea2ff; --teamA-soft:#1a2a4a;
   --teamB:#ff6b74; --teamB-soft:#4a1c22; --gold:#e0bd52; --danger:#ec7a7a; color-scheme:dark}
 *{box-sizing:border-box}
-html,body,button,a,input,select,textarea,label,summary{touch-action:manipulation} /* ダブルタップで拡大しない（指2本の拡大はできる） */
+html,body,*{touch-action:manipulation} /* ダブルタップで拡大しない（指2本の拡大はできる） */
 body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15px;line-height:1.55;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 40px}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
@@ -1335,6 +1335,12 @@ function bind(){
 if(L.pmode===undefined) L.pmode=localHasScores()?'solo':'code';
 // ID入りのURL（…#4821）で開いたら、そのまま参加の画面へ
 {const hm=(location.hash||'').match(/^#(\d{4})$/); if(hm&&!(L.link&&L.link.code===hm[1])){L.role='player'; L.pmode='code'; J.code=hm[1]; L.view='setup'; saveL();}}
+// iPhoneでダブルタップしても画面が拡大しないようにする（2回目のタップはボタンを押したことにする）
+(()=>{let last=0;
+  document.addEventListener('touchend',e=>{const now=Date.now(), quick=now-last<350; last=now;
+    if(!quick||e.touches.length) return; const t=e.target;
+    if(t.closest&&t.closest('input,textarea,select,[contenteditable]')) return;
+    e.preventDefault(); const c=t.closest&&t.closest('button,a,label,summary'); if(c) c.click();},{passive:false});})();
 document.getElementById('helpBtn').onclick=()=>{if(L.view!=='help') helpFrom=L.view; L.view='help'; render(); window.scrollTo(0,0);};
 render();
 
