@@ -226,7 +226,9 @@ tr.total td{font-weight:700;border-top:2px solid var(--fg)}
 .sc{font-size:14px;color:var(--muted);line-height:1.2}
 .hc{margin-left:3px;color:var(--gold);font-weight:700}
 .hbtn{font:inherit;font-weight:700;font-size:14px;color:var(--accent);background:var(--card);border:1.5px solid var(--accent);border-radius:8px;padding:3px 8px;cursor:pointer;white-space:nowrap}
-.multx{margin-left:4px;color:var(--gold);font-family:var(--font-num);font-size:18px;font-weight:800;white-space:nowrap}
+.hmeta{display:flex;gap:6px;align-items:baseline;margin-top:3px;white-space:nowrap}
+.carryx{color:var(--gold);font-weight:700;font-size:13px}
+.multx{margin-left:0;color:var(--gold);font-family:var(--font-num);font-size:18px;font-weight:800;white-space:nowrap}
 td .num{font-family:var(--font-num);font-size:21px;line-height:1.2}
 .extra{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .mini-step.big button{width:40px;height:40px;font-size:20px}
@@ -765,7 +767,7 @@ function vHole(){
 function sumTable(clickable){
   const rows=[];const t=totals();
   for(let i=0;i<HOLES;i++){const p=playerPts(i),H=R.holes[i];
-    rows.push(`<tr class="${clickable&&i===L.cur?'cur':''}"><td>${clickable?`<button class="hbtn" data-go="${i}" aria-label="${i+1}番ホールを開く">${i+1}H</button>`:`${i+1}H`} <span class="note">P${H.par}</span>${(Number(H.mult)||1)>1?`<b class="multx">×${H.mult}</b>`:''}${(Number(H.carry)||0)>0?`<div class="sc">越${H.carry}</div>`:''}</td>${[0,1,2,3].map(k=>{
+    rows.push(`<tr class="${clickable&&i===L.cur?'cur':''}"><td>${clickable?`<button class="hbtn" data-go="${i}" aria-label="${i+1}番ホールを開く">${i+1}H</button>`:`${i+1}H`}<div class="hmeta"><span class="note">P${H.par}</span>${(Number(H.carry)||0)>0?`<span class="carryx">越${H.carry}</span>`:''}</div>${(Number(H.mult)||1)>1?`<div><b class="multx">×${H.mult}</b></div>`:''}</td>${[0,1,2,3].map(k=>{
       const g=H.s[k], h=usedHcp(i,k);
       const pt=p?`<div class="num ${p[k]>0?'pos':p[k]<0?'neg':''}">${sign(p[k])}</div>`:`<div class="num note">·</div>`;
       return `<td>${pt}<div class="sc">${g==null?'–':g}${h?`<span class="hc">H${h}</span>`:''}</div></td>`;}).join('')}</tr>`);
