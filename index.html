@@ -772,12 +772,14 @@ function vHole(){
   ${mpHoleCard(i)}`;
 }
 // ラスベガス集計の名前：列の幅に入る一番大きい文字にする（上限16px）。1行で11pxより小さくなる時は2行に分ける
-function fitNames(){document.querySelectorAll('table.lvt .nmfit').forEach(el=>{
-  const th=el.parentElement, cs=getComputedStyle(th), w=(th.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight))*0.95;
-  const ch=[...(el.dataset.n||(el.dataset.n=el.textContent))], n=ch.length||1; if(w<=0) return;
-  let fs=Math.min(16,w/n), html=null;
-  if(fs<11&&n>1){const h=Math.ceil(n/2); fs=Math.min(16,w/h); html=esc(ch.slice(0,h).join(''))+'<br>'+esc(ch.slice(h).join(''));}
-  el.innerHTML=html||esc(ch.join('')); el.style.fontSize=Math.floor(fs*2)/2+'px';});}
+// 4人の中で一番小さくなった人の大きさに、全員をそろえる
+function fitNames(){document.querySelectorAll('table.lvt').forEach(tb=>{const els=[...tb.querySelectorAll('.nmfit')]; let min=16; const out=[];
+  els.forEach(el=>{const th=el.parentElement, cs=getComputedStyle(th), w=(th.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight))*0.95;
+    const ch=[...(el.dataset.n||(el.dataset.n=el.textContent))], n=ch.length||1; if(w<=0) return;
+    let fs=Math.min(16,w/n), html=esc(ch.join(''));
+    if(fs<11&&n>1){const h=Math.ceil(n/2); fs=Math.min(16,w/h); html=esc(ch.slice(0,h).join(''))+'<br>'+esc(ch.slice(h).join(''));}
+    out.push([el,html]); min=Math.min(min,fs);});
+  const f=Math.floor(min*2)/2+'px'; out.forEach(([el,html])=>{el.innerHTML=html; el.style.fontSize=f;});});}
 window.addEventListener('resize',()=>fitNames());
 function sumTable(clickable){
   const rows=[];const t=totals();
@@ -788,7 +790,7 @@ function sumTable(clickable){
       return `<td>${pt}<div class="sc">${g==null?'–':g}${h?`<span class="hc">H${h}</span>`:''}</div></td>`;}).join('')}</tr>`);
     if(i===8||i===17){const a=i===8?0:9, s=halfTotals(a,i);
       rows.push(`<tr class="sub"><td>${i===8?'前半計':'後半計'}</td>${[0,1,2,3].map(k=>`<td><div class="num ${s.tot[k]>0?'pos':s.tot[k]<0?'neg':''}">${sign(s.tot[k])}</div><div class="sc">${s.gro[k]||'–'}</div></td>`).join('')}</tr>`);}}
-  return `<div class="tablewrap"><table class="lvt ${R.setup.me!=null?'mc'+R.setup.me:''}"><thead><tr><th>ホール</th>${[0,1,2,3].map(k=>`<th class="${R.setup.me===k?'meh':''}"><span class="nmfit">${esc(N(k))}</span>${R.setup.me===k?'<br><span class="mytag">自分</span>':''}</th>`).join('')}</tr></thead>
+  return `<div class="tablewrap"><table class="lvt ${R.setup.me!=null?'mc'+R.setup.me:''}"><thead><tr><th>ホール</th>${[0,1,2,3].map(k=>`<th class="${R.setup.me===k?'meh':''}">${R.setup.me===k?'<span class="mytag">自分</span><br>':''}<span class="nmfit">${esc(N(k))}</span></th>`).join('')}</tr></thead>
   <tbody>${rows.join('')}
   <tr class="total"><td>ポイント</td>${t.tot.map(v=>`<td class="num ${v>0?'pos':v<0?'neg':''}">${sign(v)}</td>`).join('')}</tr>
   <tr><td>勝敗</td>${[0,1,2,3].map(k=>`<td><div class="wl"><span class="pos">${t.w[k]}勝</span><span class="neg">${t.l[k]}敗</span><span class="note">${t.d[k]}分</span></div></td>`).join('')}</tr>
