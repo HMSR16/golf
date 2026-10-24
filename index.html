@@ -41,6 +41,7 @@
   --accent:#5cc28c; --accent-soft:#1f3328; --mine:#3d3417; --teamA:#6ea2ff; --teamA-soft:#1a2a4a;
   --teamB:#ff6b74; --teamB-soft:#4a1c22; --gold:#e0bd52; --danger:#ec7a7a; color-scheme:dark}
 *{box-sizing:border-box}
+html,body,button,a,input,select,textarea,label,summary{touch-action:manipulation} /* ダブルタップで拡大しない（指2本の拡大はできる） */
 body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15px;line-height:1.55;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 40px}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
