@@ -141,6 +141,7 @@ tr.sub td:first-child{color:var(--accent)}
 .ask{font-size:17px}
 .card.linked{border:2px solid var(--accent)}
 .bigcode{font-family:var(--font-num);font-size:56px;font-weight:700;letter-spacing:.2em;text-align:center;color:var(--accent);line-height:1}
+.copyset{display:grid;gap:8px;margin:8px 0 4px}
 .urlrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .url{font-family:var(--font-num);font-size:16px;word-break:break-all;-webkit-user-select:all;user-select:all;min-width:0;flex:1 1 200px}
 .grow{display:flex;flex-direction:column;gap:4px;padding:8px 0;border-top:1px solid var(--line)}
@@ -874,6 +875,7 @@ const byName=(ev,G)=>G.by==='org'?'主催者':pName(ev,G.by);
 function groupOf(ev,pid){for(const g in ev.groups) if(ev.groups[g].members.includes(pid)) return g; return null;}
 const fmtD=d=>{const p=String(d||'').split('-'); return p.length===3?`${+p[1]}月${+p[2]}日`:'';};
 const shareUrl=code=>`https://hmsr16.github.io/golf/#${code}`;
+const APP_URL='https://hmsr16.github.io/golf/';
 const evTitle=ev=>ev.name||ev.course||'コンペ';
 
 let lvOpen=false, mpOpen=false, orgPick=null, curEv=null, J={step:'code',code:'',msg:'',early:false,me:null,picks:[]}, galMsg='', galEarly=false, orgMsg='', grmAsk=null, ormAsk=null, evDelAsk=null, orgEdit=null, prmAsk=null, rankOpen=null, regMsg='', regDel=false, busy=false;
@@ -952,19 +954,20 @@ function evCard(ev){const inG=new Set(Object.values(ev.groups).flatMap(G=>G.memb
   const gs=Object.keys(ev.groups).sort((a,b)=>a-b);
   return `<section class="card issued">${evHead(ev)}
     <div class="bigcode">${ev.code}</div>
-    <div class="urlrow"><span class="url">${esc(shareUrl(ev.code))}</span><button class="chip" data-copy="${esc(shareUrl(ev.code))}">URLをコピー</button></div>
+    <div class="copyset"><button class="btn" data-copy="${ev.code}" data-what="ID">IDをコピー</button><button class="btn ghost" data-copy="${APP_URL}" data-what="URL">URLをコピー</button></div>
+    <div class="note">IDは参加する時に入れる数字です。URLはアプリの入口です（初めての人はホーム画面に追加してから、IDで参加）。</div>
     <div class="note">共有できるのは ${fmtD(ev.date)} 0時から48時間です。参加者 ${ev.players.length}人。</div>
     <div class="label">組み合わせ</div>
     ${gs.length?gs.map(g=>{const G=ev.groups[g]; return orgPick&&orgPick.code===ev.code&&orgPick.gid===g?pickBox(ev,g):`<div class="grow"><div class="row" style="justify-content:space-between"><b>${g}組</b><button class="chip" data-gedit="${ev.code}|${g}">人を変える</button></div><div class="note">${G.members.map(x=>esc(pName(ev,x))).join('・')}</div></div>`;}).join(''):'<div class="note">まだ組は決まっていません。</div>'}
-    ${orgPick&&orgPick.code===ev.code&&!ev.groups[orgPick.gid]?pickBox(ev,orgPick.gid):`<button class="btn ghost" data-gnew="${ev.code}">${gs.length?'次の組を決める':'1組目を決める'}</button>`}
+    ${orgPick&&orgPick.code===ev.code&&!ev.groups[orgPick.gid]?pickBox(ev,orgPick.gid):`<button class="btn ${gs.length?'ghost':'ordbtn'}" data-gnew="${ev.code}">${gs.length?'次の組を決める':'1組目を決める'}</button>`}
     ${rest.length?`<div class="note">まだ組に入っていない人：${rest.map(p=>esc(p.name)).join('・')}</div>`:''}
-    ${orgEdit===ev.code?evEdit(ev):`<button class="btn ghost" data-oedit="${ev.code}">内容を直す（パー・参加者）</button>`}
+    ${orgEdit===ev.code?evEdit(ev):`<button class="btn ghost" data-oedit="${ev.code}">内容を直す（Hole Par・参加者）</button>`}
     ${evDelAsk===ev.code?`<div class="confirm"><div>このイベント（ID ${ev.code}）を削除しますか？ 組み合わせと、全員が入力したスコアも消えます。参加中の人も共有から外れます。元に戻せません。</div><div class="row"><button class="btn danger" id="evDelYes">削除する</button><button class="btn ghost" id="evDelNo">やめる</button></div></div>`
       :`<button class="btn danger" data-evdel="${ev.code}">このイベントを削除</button>`}
   </section>`;}
 // 発行後の修正（発行した主催者だけ）。開催日は変えられない
 function evEdit(ev){const hasSc=pid=>(ev.scores[pid]||[]).some(v=>v!=null);
-  return `<div class="editbox"><div class="label">各ホールのパー（タップで 4→5→3 と変わります）</div>
+  return `<div class="editbox"><div class="label">Hole Par（タップで 4→5→3 と変わります）</div>
     ${[0,9].map(a=>`<div class="pgrid">${[...Array(9)].map((_,j)=>`<button class="pc" data-ep="${a+j}">${a+j+1}<b>${ev.pars[a+j]}</b></button>`).join('')}<div class="pc tot">${a?'IN':'OUT'}<b>${ev.pars.slice(a,a+9).reduce((x,y)=>x+y,0)}</b></div></div>`).join('')}
     <div class="note">パーを変えると、入力済みのスコアの表示と順位も新しいパーで計算し直されます。</div>
     <div class="label">参加者（${ev.players.length}人・最大40人）</div>
@@ -981,7 +984,7 @@ function vOrg(){const o=orgDraft(), names=orgNames(), mine=myEvents().map(e=>Sha
     <div class="label">開催日</div><input type="date" id="oDate" value="${esc(o.date)}">
     <div class="label">コンペ名称（任意）</div><input type="text" id="oName" value="${esc(o.name)}" placeholder="例：○○杯">
     <div class="label">ゴルフ場名</div><input type="text" id="oCourse" value="${esc(o.course)}" placeholder="例：○○カントリークラブ">
-    <div class="label">各ホールのパー（タップで 4→5→3 と変わります）</div>
+    <div class="label">Hole Par（タップで 4→5→3 と変わります）</div>
     ${[0,9].map(a=>`<div class="pgrid">${[...Array(9)].map((_,j)=>`<button class="pc" data-op="${a+j}">${a+j+1}<b>${o.pars[a+j]}</b></button>`).join('')}<div class="pc tot">${a?'IN':'OUT'}<b>${o.pars.slice(a,a+9).reduce((x,y)=>x+y,0)}</b></div></div>`).join('')}
     <div class="label">参加者の名前（1行に1人・最大40人）</div>
     <textarea id="oNames" rows="8" placeholder="山田太郎&#10;鈴木花子">${esc(o.names)}</textarea>
@@ -1104,8 +1107,9 @@ function bindShared(){const $=id=>document.getElementById(id);
       B.addPlayer(eev.code,n).then(()=>{toast=`${n}さんを追加しました。`; render();}).catch(edErr);};
   }
   if($('ormYes')) $('ormYes').onclick=()=>{const [code,pid]=ormAsk.split('|'); ormAsk=null; B.removeFromGroup(code,pid).catch(netErr); render();};
-  document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{const t=b.dataset.copy;
-    try{navigator.clipboard.writeText(t).then(()=>{toast='URLをコピーしました。LINEなどに貼り付けられます。';render();},()=>{toast='コピーできませんでした。URLを長押しして選んでください。';render();});}catch(e){toast='コピーできませんでした。URLを長押しして選んでください。';render();}});
+  document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{const t=b.dataset.copy, w=b.dataset.what||'URL';
+    const ng=()=>{toast=`コピーできませんでした。${w==='ID'?'IDの数字':'URL'}を書き写して送ってください。${w==='URL'?'（'+t+'）':''}`;render();};
+    try{navigator.clipboard.writeText(t).then(()=>{toast=`${w}をコピーしました。LINEなどに貼り付けられます。`;render();},ng);}catch(e){ng();}});
   // プレーヤー
   if($('toJoin')) $('toJoin').onclick=()=>{L.pmode='code'; saveL(); render();};
   if($('soloGo')) $('soloGo').onclick=()=>{L.pmode='solo'; saveL(); render();};
