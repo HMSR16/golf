@@ -757,9 +757,9 @@ function sumTable(clickable){
     rows.push(`<tr class="${clickable&&i===L.cur?'cur':''}" ${clickable?`data-go="${i}"`:''}><td>${i+1}H <span class="note">P${H.par}</span>${(Number(H.mult)||1)>1?`<div class="sc hc">×${H.mult}</div>`:''}${(Number(H.carry)||0)>0?`<div class="sc">越${H.carry}</div>`:''}</td>${[0,1,2,3].map(k=>{
       const g=H.s[k], h=usedHcp(i,k);
       const pt=p?`<div class="num ${p[k]>0?'pos':p[k]<0?'neg':''}">${sign(p[k])}</div>`:`<div class="num note">·</div>`;
-      return `<td>${pt}<div class="sc">${g==null?'–':g}${h?`<span class="hc">H${h}</span>`:''}${PT()&&R.setup.me===k&&H.putt!=null?`<span class="pt">パ${H.putt}</span>`:''}</div></td>`;}).join('')}</tr>`);
+      return `<td>${pt}<div class="sc">${g==null?'–':g}${h?`<span class="hc">H${h}</span>`:''}</div></td>`;}).join('')}</tr>`);
     if(i===8||i===17){const a=i===8?0:9, s=halfTotals(a,i);
-      rows.push(`<tr class="sub"><td>${i===8?'前半計':'後半計'}</td>${[0,1,2,3].map(k=>`<td><div class="num ${s.tot[k]>0?'pos':s.tot[k]<0?'neg':''}">${sign(s.tot[k])}</div><div class="sc">${s.gro[k]||'–'}${PT()&&R.setup.me===k&&s.putt?`<span class="pt">パ${s.putt}</span>`:''}</div></td>`).join('')}</tr>`);}}
+      rows.push(`<tr class="sub"><td>${i===8?'前半計':'後半計'}</td>${[0,1,2,3].map(k=>`<td><div class="num ${s.tot[k]>0?'pos':s.tot[k]<0?'neg':''}">${sign(s.tot[k])}</div><div class="sc">${s.gro[k]||'–'}</div></td>`).join('')}</tr>`);}}
   return `<div class="tablewrap"><table class="${R.setup.me!=null?'mc'+R.setup.me:''}"><thead><tr><th>ホール</th>${[0,1,2,3].map(k=>`<th class="${R.setup.me===k?'meh':''}">${esc(N(k))}${R.setup.me===k?'<br><span class="mytag">自分</span>':''}</th>`).join('')}</tr></thead>
   <tbody>${rows.join('')}
   <tr class="total"><td>ポイント</td>${t.tot.map(v=>`<td class="num ${v>0?'pos':v<0?'neg':''}">${sign(v)}</td>`).join('')}</tr>
@@ -767,12 +767,11 @@ function sumTable(clickable){
   <tr><td>スコア</td>${t.gro.map(v=>`<td class="num">${v||'–'}</td>`).join('')}</tr>
   <tr><td>ハンデ</td>${t.hc.map(v=>`<td class="num">${v}</td>`).join('')}</tr>
   <tr><td>ネット</td>${t.gro.map((v,k)=>`<td class="num">${v?v-t.hc[k]:'–'}</td>`).join('')}</tr>
-  ${PT()?(()=>{const ps=R.holes.map(h=>h.putt).filter(v=>v!=null);return `<tr><td>パット</td>${[0,1,2,3].map(k=>`<td class="num">${k===R.setup.me&&ps.length?ps.reduce((a,b)=>a+b,0):'–'}</td>`).join('')}</tr>`;})():''}
   </tbody></table></div>
-  <div class="note">各マスは上がポイント、下が実際のスコア（H＝実際に引いたハンデ。パーより良くはならないので、設定より少ないことがあります）。×は倍率、越は持ち越し${PT()?'、パは自分のパット数':''}。${clickable?'行をタップするとそのホールを開きます。':''}</div>`;
+  <div class="note">各マスは上がポイント、下が実際のスコア（H＝実際に引いたハンデ。パーより良くはならないので、設定より少ないことがあります）。×は倍率、越は持ち越し。${clickable?'行をタップするとそのホールを開きます。':''}</div>`;
 }
 function vSum(){const hd=(t,sub)=>`<h2 class="sumhead">${t}${sub?`<small>${esc(sub)}</small>`:''}</h2>`;
-  return `${R.setup.lvOn?`${hd('ラスベガス',R.setup.course)}<section class="card">${sumTable(true)}</section>`:''}${hd('スコアカード','同じ組')}<section class="card">${scoreCards()}</section>${mpMatches().length?`${hd('マッチプレー')}<section class="card">${mpSummary(true)}</section>`:''}${L.link&&curEv?`${hd('順位表','実際のスコア（ハンデなし）の少ない順')}<section class="card">${rankHtml(rankRows(curEv),curEv.pars,L.link.pid)}</section>`:''}`;}
+  return `${R.setup.lvOn?`${hd('ラスベガス',R.setup.course)}<section class="card">${sumTable(true)}</section>`:''}${hd('スコアカード','同じ組')}<section class="card">${scoreCards()}</section>${mpMatches().length?`${hd('マッチプレー')}<section class="card">${mpSummary(true)}</section>`:''}${L.link&&curEv?`${hd('順位表','Gross')}<section class="card">${rankHtml(rankRows(curEv),curEv.pars,L.link.pid)}</section>`:''}`;}
 function vHistInner(){
   const list=allHistory();
   if(histOpen){const rec=list.find(h=>h.id===histOpen); if(!rec){histOpen=null;return vHist();}
