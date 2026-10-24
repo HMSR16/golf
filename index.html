@@ -221,10 +221,8 @@ table.lvt{table-layout:fixed}
 table.lvt th:first-child{width:78px}
 table.lvt :is(th,td):first-child{padding-left:4px;padding-right:2px}
 table.lvt :is(th,td):not(:first-child){padding-left:2px;padding-right:2px}
-table.lvt thead th:not(:first-child){font-size:13px;white-space:normal;word-break:break-all;text-wrap:balance;line-height:1.25;vertical-align:bottom}
-table.lvt thead th.nm4{font-size:11.5px}
-table.lvt thead th.nm5{font-size:11px}
-table.lvt thead th.nm7{font-size:10px}
+table.lvt thead th:not(:first-child){font-size:13px;line-height:1.25;vertical-align:bottom}
+table.lvt .nmfit{display:block;white-space:nowrap;overflow:hidden}
 tr.total td{font-weight:700;border-top:2px solid var(--fg)}
 .pos{color:var(--teamA)} .neg{color:var(--teamB)}
 .parh{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px 12px;padding:2px 0 6px}
@@ -597,7 +595,7 @@ function renderInner(){
   if(shared&&!shared.data) body=`<section class="card"><div class="note">共有ラウンドを読み込み中…</div></section>`;
   else body=L.view==='help'?vHelp():L.view==='setup'?vSetupAll():L.view==='hole'?vHole():L.view==='sum'?vSum():vHist();
   v.innerHTML=`<div class="wrap${L.view==='setup'?' setupv':''}" style="padding:0">${top}${body}</div>`;
-  bind();
+  bind(); fitNames();
 }
 function banner(){
   let h='';
@@ -773,8 +771,14 @@ function vHole(){
   <section class="result">${res}</section>`:''}
   ${mpHoleCard(i)}`;
 }
-// 名前が長い人だけ、見出しの文字を小さくする
-const nmSize=n=>{const c=[...String(n||'')].length; return c>=6?'nm7':c>=5?'nm5':c>=4?'nm4':'';};
+// ラスベガス集計の名前：列の幅に入る一番大きい文字にする（上限16px）。1行で11pxより小さくなる時は2行に分ける
+function fitNames(){document.querySelectorAll('table.lvt .nmfit').forEach(el=>{
+  const th=el.parentElement, cs=getComputedStyle(th), w=(th.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight))*0.95;
+  const ch=[...(el.dataset.n||(el.dataset.n=el.textContent))], n=ch.length||1; if(w<=0) return;
+  let fs=Math.min(16,w/n), html=null;
+  if(fs<11&&n>1){const h=Math.ceil(n/2); fs=Math.min(16,w/h); html=esc(ch.slice(0,h).join(''))+'<br>'+esc(ch.slice(h).join(''));}
+  el.innerHTML=html||esc(ch.join('')); el.style.fontSize=Math.floor(fs*2)/2+'px';});}
+window.addEventListener('resize',()=>fitNames());
 function sumTable(clickable){
   const rows=[];const t=totals();
   for(let i=0;i<HOLES;i++){const p=playerPts(i),H=R.holes[i];
@@ -784,7 +788,7 @@ function sumTable(clickable){
       return `<td>${pt}<div class="sc">${g==null?'–':g}${h?`<span class="hc">H${h}</span>`:''}</div></td>`;}).join('')}</tr>`);
     if(i===8||i===17){const a=i===8?0:9, s=halfTotals(a,i);
       rows.push(`<tr class="sub"><td>${i===8?'前半計':'後半計'}</td>${[0,1,2,3].map(k=>`<td><div class="num ${s.tot[k]>0?'pos':s.tot[k]<0?'neg':''}">${sign(s.tot[k])}</div><div class="sc">${s.gro[k]||'–'}</div></td>`).join('')}</tr>`);}}
-  return `<div class="tablewrap"><table class="lvt ${R.setup.me!=null?'mc'+R.setup.me:''}"><thead><tr><th>ホール</th>${[0,1,2,3].map(k=>`<th class="${R.setup.me===k?'meh':''} ${nmSize(N(k))}">${esc(N(k))}${R.setup.me===k?'<br><span class="mytag">自分</span>':''}</th>`).join('')}</tr></thead>
+  return `<div class="tablewrap"><table class="lvt ${R.setup.me!=null?'mc'+R.setup.me:''}"><thead><tr><th>ホール</th>${[0,1,2,3].map(k=>`<th class="${R.setup.me===k?'meh':''}"><span class="nmfit">${esc(N(k))}</span>${R.setup.me===k?'<br><span class="mytag">自分</span>':''}</th>`).join('')}</tr></thead>
   <tbody>${rows.join('')}
   <tr class="total"><td>ポイント</td>${t.tot.map(v=>`<td class="num ${v>0?'pos':v<0?'neg':''}">${sign(v)}</td>`).join('')}</tr>
   <tr><td>勝敗</td>${[0,1,2,3].map(k=>`<td><div class="wl"><span class="pos">${t.w[k]}勝</span><span class="neg">${t.l[k]}敗</span><span class="note">${t.d[k]}分</span></div></td>`).join('')}</tr>
