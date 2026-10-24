@@ -83,7 +83,10 @@ input[type=text],input[type=number]{font:inherit;color:var(--fg);background:var(
 .optitem b{display:block}
 .optitem span{font-size:12.5px;color:var(--muted)}
 .optitem input{margin-top:4px;accent-color:var(--accent)}
-.hcpgrid{display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:center}
+.hcpgrid{display:grid;gap:8px}
+.hcpp{background:var(--accent-soft);border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:grid;gap:6px}
+.hcpp .hname{font-weight:700}
+.hcpp .parh{padding:0}
 .btn{font:inherit;font-weight:700;border-radius:10px;padding:11px 14px;border:1px solid var(--accent);background:var(--accent);color:var(--bg);cursor:pointer}
 .btn.ghost{background:transparent;color:var(--accent)}
 .btn.danger{border-color:var(--danger);background:transparent;color:var(--danger)}
@@ -616,7 +619,7 @@ function endCard(){
     <div class="endrow${ended?' noback':''}"><button class="btn danger" id="discardEnd">保存しない</button>${REG?'<button class="btn big" id="saveEnd">保存して終了</button>':'<button class="btn big" id="regGo">登録して保存する</button>'}${ended?'':`<button class="btn ghost" id="endBack">戻る</button>`}</div></section>`;
 }
 function hcpBlock(s,h){const T=h?s.hcp2:s.hcp, P=h?s.hcpPar2:s.hcpPar;
-  return `<div class="hcpgrid">${[0,1,2,3].map(k=>`<div>${esc(N(k))}</div><div class="chips" data-hcp="${k}" data-half="${h}">${[['none','なし'],['all1','オール1'],['par','パー別'],['hole','ホール毎']].map(([v,l])=>`<button class="chip" data-hv="${v}" aria-pressed="${T[k]===v}">${l}</button>`).join('')}</div>${T[k]==='par'?`<div class="parh">${[3,4,5].map(p=>`<div class="mini-step"><span>パー${p}</span><button data-pk="${k}" data-pp="${p}" data-half="${h}" data-d="-1" aria-label="パー${p}のハンデを減らす">−</button><b>${P[k][p]}</b><button data-pk="${k}" data-pp="${p}" data-half="${h}" data-d="1" aria-label="パー${p}のハンデを増やす">＋</button></div>`).join('')}</div>`:''}`).join('')}</div>`;}
+  return `<div class="hcpgrid">${[0,1,2,3].map(k=>`<div class="hcpp"><div class="hname">${esc(N(k))}</div><div class="chips" data-hcp="${k}" data-half="${h}">${[['none','なし'],['all1','オール1'],['par','パー別'],['hole','ホール毎']].map(([v,l])=>`<button class="chip" data-hv="${v}" aria-pressed="${T[k]===v}">${l}</button>`).join('')}</div>${T[k]==='par'?`<div class="parh">${[3,4,5].map(p=>`<div class="mini-step"><span>パー${p}</span><button data-pk="${k}" data-pp="${p}" data-half="${h}" data-d="-1" aria-label="パー${p}のハンデを減らす">−</button><b>${P[k][p]}</b><button data-pk="${k}" data-pp="${p}" data-half="${h}" data-d="1" aria-label="パー${p}のハンデを増やす">＋</button></div>`).join('')}</div>`:''}</div>`).join('')}</div>`;}
 // ラスベガス・マッチプレーを「する／しない」
 function onOff(kind,on){const nm=kind==='lv'?'ラスベガス':'マッチプレー';
   return `<section class="card"><div class="label">${nm}を</div><div class="chips onoff" id="${kind}On"><button class="chip" data-on="1" aria-pressed="${on}">する</button><button class="chip" data-on="0" aria-pressed="${!on}">しない</button></div>
