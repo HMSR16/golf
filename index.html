@@ -772,7 +772,7 @@ function sumTable(clickable){
   <div class="note">各マスは上がポイント、下が実際のスコア（H＝実際に引いたハンデ。パーより良くはならないので、設定より少ないことがあります）。×は倍率、越は持ち越し。${clickable?'行をタップするとそのホールを開きます。':''}</div>`;
 }
 function vSum(){const hd=(t,sub)=>`<h2 class="sumhead">${t}${sub?`<small>${esc(sub)}</small>`:''}</h2>`;
-  return `${R.setup.lvOn?`${hd('ラスベガス',R.setup.course)}<section class="card">${sumTable(true)}</section>`:''}${hd('スコアカード','同じ組')}<section class="card">${scoreCards()}</section>${mpMatches().length?`${hd('マッチプレー')}<section class="card">${mpSummary(true)}</section>`:''}${L.link&&curEv?`${hd('順位表','Gross')}<section class="card">${rankHtml(rankRows(curEv),curEv.pars,L.link.pid)}</section>`:''}`;}
+  return `${R.setup.lvOn?`${hd('ラスベガス',R.setup.course)}<section class="card">${sumTable(true)}</section>`:''}${hd('スコアカード','同組')}<section class="card">${scoreCards()}</section>${mpMatches().length?`${hd('マッチプレー')}<section class="card">${mpSummary(true)}</section>`:''}${L.link&&curEv?`${hd('順位表','Gross')}<section class="card">${rankHtml(rankRows(curEv),curEv.pars,L.link.pid)}</section>`:''}`;}
 function vHistInner(){
   const list=allHistory();
   if(histOpen){const rec=list.find(h=>h.id===histOpen); if(!rec){histOpen=null;return vHist();}
