@@ -180,6 +180,9 @@ input[type=email]{font:inherit;font-size:17px;color:var(--fg);background:var(--b
 .editbox{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:12px}
 .elist{display:flex;flex-direction:column;gap:6px}
 .erow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+.erow.nrow{grid-template-columns:2.2em minmax(0,1fr) auto}
+.nno{text-align:right;font-family:var(--font-num);font-weight:700;color:var(--muted)}
+.btn.addrow{background:var(--accent);border-color:var(--accent);color:var(--card);margin-top:8px;width:100%}
 .onoff .chip{min-width:96px;min-height:44px;font-size:18px;font-weight:700}
 .secbtn{display:flex;justify-content:space-between;align-items:center;font-size:18px;padding:14px 16px}
 .secbtn span{font-size:14px;font-weight:500;opacity:.9}
@@ -970,6 +973,9 @@ const loadingCard=t=>`<section class="card"><div class="note">${t||'読み込み
 /* ---------- 主催者 ---------- */
 function orgDraft(){if(!L.org) L.org={date:today(),name:'',course:'',pars:Array(HOLES).fill(4),names:''}; return L.org;}
 function orgNames(){return orgDraft().names.split('\n').map(s=>s.trim()).filter(Boolean);}
+// 入力欄の行（空の行も含む）。最初は4行
+function orgLines(){const a=orgDraft().names.split('\n'); while(a.length<4) a.push(''); return a;}
+let orgFocus=null;
 // 発行したイベント（このスマホで発行したもの）。期限が過ぎたものは一覧から外す
 function myEvents(){const now=Date.now(); return (L.myEvents||[]).map(e=>typeof e==='string'?{code:e}:e).filter(e=>!e.end||now<=e.end);}
 // 組の人を選ぶ（主催者）。ほかの組に入っている人も選べ、選ぶとこの組に移る
@@ -1016,8 +1022,9 @@ function vOrg(){const o=orgDraft(), names=orgNames(), mine=myEvents().map(e=>Sha
     <div class="label">ゴルフ場名</div><input type="text" id="oCourse" value="${esc(o.course)}" placeholder="例：○○カントリークラブ">
     <div class="label">Hole Par（タップで 4→5→3 と変わります）</div>
     ${[0,9].map(a=>`<div class="pgrid">${[...Array(9)].map((_,j)=>`<button class="pc" data-op="${a+j}">${a+j+1}<b>${o.pars[a+j]}</b></button>`).join('')}<div class="pc tot">${a?'IN':'OUT'}<b>${o.pars.slice(a,a+9).reduce((x,y)=>x+y,0)}</b></div></div>`).join('')}
-    <div class="label">参加者の名前（1行に1人・最大40人）</div>
-    <textarea id="oNames" rows="8" placeholder="山田太郎&#10;鈴木花子">${esc(o.names)}</textarea>
+    <div class="label">参加者の名前（最大40人）</div>
+    <div class="elist">${orgLines().map((n,i)=>`<div class="erow nrow"><span class="nno">${i+1}</span><input type="text" data-oi="${i}" value="${esc(n)}" placeholder="名前" aria-label="${i+1}人目の名前" enterkeyhint="next"><button class="chip" data-orm="${i}" aria-label="${i+1}行目を消す">✕</button></div>`).join('')}</div>
+    ${orgLines().length<MAXP?'<button class="btn addrow" id="oAddRow">＋ 行を追加</button>':''}
     <div id="oCount" class="note${names.length>MAXP?' warnTxt':''}">${names.length}人${names.length>MAXP?'（40人までです）':''}</div>
     ${orgMsg?`<div class="toast warn">${esc(orgMsg)}</div>`:''}
     <button class="btn" id="oIssue"${busy?' disabled':''}>${busy?'発行しています…':'IDを発行する'}</button>
@@ -1095,7 +1102,15 @@ function bindShared(){const $=id=>document.getElementById(id);
   const o=L.org;
   if($('oDate')){$('oDate').onchange=e=>{o.date=e.target.value;saveL();};
     $('oName').oninput=e=>{o.name=e.target.value;saveL();}; $('oCourse').oninput=e=>{o.course=e.target.value;saveL();};
-    $('oNames').oninput=e=>{o.names=e.target.value;saveL(); const n=orgNames().length, c=$('oCount'); if(c){c.textContent=n+'人'+(n>MAXP?'（40人までです）':''); c.className='note'+(n>MAXP?' warnTxt':'');}};
+    const cnt=()=>{const n=orgNames().length, c=$('oCount'); if(c){c.textContent=n+'人'+(n>MAXP?'（40人までです）':''); c.className='note'+(n>MAXP?' warnTxt':'');}};
+    document.querySelectorAll('[data-oi]').forEach(x=>{
+      x.oninput=e=>{const a=orgLines(); a[+x.dataset.oi]=e.target.value.replace(/\n/g,''); o.names=a.join('\n'); saveL(); cnt();};
+      x.onkeydown=e=>{if(e.key!=='Enter'||e.isComposing) return; e.preventDefault(); const i=+x.dataset.oi, a=orgLines();
+        if(i+1<a.length){const nx=document.querySelector(`[data-oi="${i+1}"]`); if(nx) nx.focus(); return;}
+        if(a.length<MAXP){a.push(''); o.names=a.join('\n'); saveL(); orgFocus=a.length-1; render();}};});
+    document.querySelectorAll('[data-orm]').forEach(b=>b.onclick=()=>{const a=orgLines(); a.splice(+b.dataset.orm,1); o.names=a.join('\n'); saveL(); render();});
+    if($('oAddRow')) $('oAddRow').onclick=()=>{const a=orgLines(); if(a.length>=MAXP) return; a.push(''); o.names=a.join('\n'); saveL(); orgFocus=a.length-1; render();};
+    if(orgFocus!=null){const f=document.querySelector(`[data-oi="${orgFocus}"]`); orgFocus=null; if(f){f.focus(); f.scrollIntoView({block:'center'});}}
     document.querySelectorAll('[data-op]').forEach(b=>b.onclick=()=>{const i=+b.dataset.op; o.pars[i]=o.pars[i]===4?5:o.pars[i]===5?3:4; saveL(); render();});
     $('oIssue').onclick=async()=>{if(busy) return; const names=orgNames(); orgMsg='';
       if(!o.date) orgMsg='開催日を入れてください。'; else if(!o.course.trim()) orgMsg='ゴルフ場名を入れてください。';
