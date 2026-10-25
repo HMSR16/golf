@@ -465,7 +465,7 @@ function mpHc(i,k,m){const h=mhOf(m.b); if(!((h.who==='me'&&k===m.a)||(h.who==='
   if(h.mode==='holes') return h.holes.includes(i)?1:0;
   return Number(h.v[R.holes[i].par])||0;}
 function mpNet(i,k,m){const g=mpSc(i,k),par=R.holes[i].par,h=mpHc(i,k,m); if(g==null) return null;
-  if(!R.setup.mp.cap) return g-h; return g>par?Math.max(par,g-h):g;}
+  return g>par?Math.max(par,g-h):g;} // ハンデを引いてもパーより良くはしない
 // up>0 なら自分がリード。残りホール数より差が大きくなったら決着、それ以降は数えない
 function mpRun(m,upto){upto=upto==null?HOLES-1:upto; let up=0,dec=null,last=-1; const w=[0,0,0], cells=[];
   for(let i=0;i<HOLES;i++){
@@ -711,8 +711,7 @@ function mpSetupCard(s){const mp=s.mp;
     <button class="btn ghost" id="extAdd">場外の相手を追加（手入力）</button>
     ${mp.ext.length?'<div class="note">場外の人は追加すると自動で対戦になります。パーは「スコア」画面で入れたものを使います。</div>':''}
     ${ms.length?`<div class="label">ハンデ（対戦ごと・パー3・4・5ごとに引く打数）</div><div class="mlist">${hc}</div>
-      ${ms.some(m=>mhOf(m.b).who!=='none')?`<div class="chips" id="mpCap"><button class="chip" data-c="1" aria-pressed="${!!mp.cap}">パーより良くしない</button><button class="chip" data-c="0" aria-pressed="${!mp.cap}">パーより良くなってもよい</button></div>
-      <div class="note">例：「自分がもらう」でパー4に1打、自分のスコア5 → ネット4で相手と比べます。ほかの対戦には影響しません。</div>`:''}
+      ${ms.some(m=>mhOf(m.b).who!=='none')?`      <div class="note">例：「自分がもらう」でパー4に1打、自分のスコア5 → ネット4で相手と比べます。ほかの対戦には影響しません。ハンデを引いてもパーより良くはなりません。</div>`:''}
       <div class="terms"><b>アップ／ダウン</b><span>何ホール勝ち越し／負け越しているか</span><b>オールスクエア</b><span>同点</span><b>ドーミー</b><span>差と残りホール数が同じ</span><b>3&amp;2</b><span>残り2ホールで3アップになり勝ちが決まった</span></div>`:''}
   </section>`;}
 function mpHoleCard(i){const ms=mpMatches().filter(m=>!isExt(m.b)); if(!ms.length) return '';
@@ -1313,7 +1312,6 @@ function bindMp(){const $=id=>document.getElementById(id);
     mpSet(mp=>{const h=mp.mh[o]; if(!h) return; const hs=h.holes||[]; h.holes=hs.includes(i)?hs.filter(x=>x!==i):hs.concat([i]).sort((a,b)=>a-b);});});
   document.querySelectorAll('[data-lkadd]').forEach(b=>b.onclick=()=>mpSet(mp=>{const pid=b.dataset.lkadd, id=Math.max(3,...mp.ext,...Object.keys(mp.names).map(Number))+1;
     mp.ext.push(id); mp.names[id]=pName(curEv,pid); mp.xs[id]=Array(HOLES).fill(null); (mp.lk||(mp.lk={}))[id]=pid;}));
-  if($('mpCap')) $('mpCap').onclick=e=>{const b=e.target.closest('[data-c]'); if(b) mpSet(mp=>mp.cap=b.dataset.c==='1');};
 }
 function bind(){
   const $=id=>document.getElementById(id);
