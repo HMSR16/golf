@@ -151,7 +151,11 @@ tr.sub td:first-child{color:var(--accent)}
 .copyset{display:grid;gap:8px;margin:8px 0 4px}
 .urlrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .url{font-family:var(--font-num);font-size:16px;word-break:break-all;-webkit-user-select:all;user-select:all;min-width:0;flex:1 1 200px}
-.grow{display:flex;flex-direction:column;gap:4px;padding:8px 0;border-top:1px solid var(--line)}
+.grow{display:flex;flex-direction:column;gap:8px;padding:10px 12px;margin:8px 0;background:var(--accent-soft);border:1px solid var(--line);border-radius:10px}
+.gno{font-size:19px;font-weight:800;color:var(--accent)}
+.gmem{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.gmem span{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:16px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gsel{display:grid;gap:6px;padding:10px 12px;background:var(--accent-soft);border-radius:10px}
 .pgrid{display:grid;grid-template-columns:repeat(9,minmax(0,1fr)) minmax(0,1.3fr);gap:3px}
 .pc{font:inherit;font-family:var(--font-num);font-size:13px;color:var(--muted);line-height:1.1;padding:4px 0;border-radius:8px;border:1px solid var(--line);background:var(--card);cursor:pointer;min-height:48px;text-align:center}
 .pc b{display:block;font-size:22px;color:var(--fg)}
@@ -983,7 +987,7 @@ function pickBox(ev,g){const sel=orgPick.sel;
     <div class="plist">${ev.players.map(p=>{const og=groupOf(ev,p.id), on=sel.includes(p.id);
       return `<button class="pbtn${on?' on':og&&og!==g?' taken':''}" data-gsel="${p.id}" aria-pressed="${on}">${esc(p.name)}${og&&og!==g?`<small>今は${og}組</small>`:''}</button>`;}).join('')}</div>
     <div class="note"><span class="swatch taken"></span>灰色＝ほかの組に入っている人（選ぶとこの組に移ります）　<span class="swatch"></span>白＝まだ組に入っていない人</div>
-    <div class="note">${g}組：${sel.length?sel.map(x=>esc(pName(ev,x))).join('・'):'まだ選んでいません'}</div>
+    <div class="gsel"><b class="gno">${g}組</b>${sel.length?`<div class="gmem">${sel.map(x=>`<span>${esc(pName(ev,x))}</span>`).join('')}</div>`:'<div class="note">まだ選んでいません</div>'}</div>
     <div class="row"><button class="btn" id="gSave">${g}組をこの人で決める</button><button class="btn ghost" id="gCancel">やめる</button></div></div>`;}
 function evCard(ev){const inG=new Set(Object.values(ev.groups).flatMap(G=>G.members)), rest=ev.players.filter(p=>!inG.has(p.id));
   const gs=Object.keys(ev.groups).sort((a,b)=>a-b);
@@ -993,7 +997,7 @@ function evCard(ev){const inG=new Set(Object.values(ev.groups).flatMap(G=>G.memb
     <div class="note">IDは参加する時に入れる数字です。URLはアプリの入口です（初めての人はホーム画面に追加してから、IDで参加）。</div>
     <div class="note">共有できるのは ${fmtD(ev.date)} 0時から48時間です。参加者 ${ev.players.length}人。</div>
     <div class="label">組み合わせ</div>
-    ${gs.length?gs.map(g=>{const G=ev.groups[g]; return orgPick&&orgPick.code===ev.code&&orgPick.gid===g?pickBox(ev,g):`<div class="grow"><div class="row" style="justify-content:space-between"><b>${g}組</b><button class="chip" data-gedit="${ev.code}|${g}">人を変える</button></div><div class="note">${G.members.map(x=>esc(pName(ev,x))).join('・')}</div></div>`;}).join(''):'<div class="note">まだ組は決まっていません。</div>'}
+    ${gs.length?gs.map(g=>{const G=ev.groups[g]; return orgPick&&orgPick.code===ev.code&&orgPick.gid===g?pickBox(ev,g):`<div class="grow"><div class="row" style="justify-content:space-between"><b class="gno">${g}組</b><button class="chip" data-gedit="${ev.code}|${g}">人を変える</button></div><div class="gmem">${G.members.map(x=>`<span>${esc(pName(ev,x))}</span>`).join('')}</div></div>`;}).join(''):'<div class="note">まだ組は決まっていません。</div>'}
     ${orgPick&&orgPick.code===ev.code&&!ev.groups[orgPick.gid]?pickBox(ev,orgPick.gid):`<button class="btn ${gs.length?'ghost':'ordbtn'}" data-gnew="${ev.code}">${gs.length?'次の組を決める':'1組目を決める'}</button>`}
     ${rest.length?`<div class="note">まだ組に入っていない人：${rest.map(p=>esc(p.name)).join('・')}</div>`:''}
     ${orgEdit===ev.code?evEdit(ev):`<button class="btn ghost" data-oedit="${ev.code}">内容を直す（Hole Par・参加者）</button>`}
