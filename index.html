@@ -589,7 +589,7 @@ function remoteRender(){const a=document.activeElement;
 document.addEventListener('focusout',()=>{if(deferred){deferred=false;setTimeout(render,0);}});
 
 // 画面の書き換え中にもう一度書き換えが起きたら（入力欄から指を離した瞬間など）、終わってからやり直す
-let rendering=false;
+let rendering=false, lastHtml='', lastView='';
 function render(){
   if(rendering){setTimeout(render,0);return;}
   rendering=true; try{renderInner();}finally{rendering=false;}
@@ -604,7 +604,12 @@ function renderInner(){
   let body;
   if(shared&&!shared.data) body=`<section class="card"><div class="note">共有ラウンドを読み込み中…</div></section>`;
   else body=L.view==='help'?vHelp():L.view==='setup'?vSetupAll():L.view==='hole'?vHole():L.view==='sum'?vSum():vHist();
-  v.innerHTML=`<div class="wrap${L.view==='setup'?' setupv':''}" style="padding:0">${top}${body}</div>`;
+  const html=`<div class="wrap${L.view==='setup'?' setupv':''}" style="padding:0">${top}${body}</div>`;
+  if(html===lastHtml) return; // 中身が変わっていなければ描き直さない（画面がぶれない）
+  // 描き直しの前後で、見ている枠（組・選ぶ画面）が同じ位置に来るようにする
+  let anc=null; if(lastView===L.view){let best=1e9; v.querySelectorAll('[data-anc]').forEach(el=>{const t=el.getBoundingClientRect().top, d=Math.abs(t-innerHeight/3); if(t<innerHeight&&el.getBoundingClientRect().bottom>0&&d<best){best=d; anc=[el.dataset.anc,t];}});}
+  v.innerHTML=html; lastHtml=html; lastView=L.view;
+  if(anc){const el=v.querySelector(`[data-anc="${anc[0]}"]`); if(el){const dy=el.getBoundingClientRect().top-anc[1]; if(Math.abs(dy)>1) window.scrollBy(0,dy);}}
   bind(); fitNames();
 }
 function banner(){
@@ -983,7 +988,7 @@ let orgFocus=null;
 function myEvents(){const now=Date.now(); return (L.myEvents||[]).map(e=>typeof e==='string'?{code:e}:e).filter(e=>!e.end||now<=e.end);}
 // 組の人を選ぶ（主催者）。ほかの組に入っている人も選べ、選ぶとこの組に移る
 function pickBox(ev,g){const sel=orgPick.sel;
-  return `<div class="pickbox"><b>${g}組の人を選んでください（最大4人）</b>
+  return `<div class="pickbox" data-anc="pick${ev.code}"><b>${g}組の人を選んでください（最大4人）</b>
     <div class="plist">${ev.players.map(p=>{const og=groupOf(ev,p.id), on=sel.includes(p.id);
       return `<button class="pbtn${on?' on':og&&og!==g?' taken':''}" data-gsel="${p.id}" aria-pressed="${on}">${esc(p.name)}${og&&og!==g?`<small>今は${og}組</small>`:''}</button>`;}).join('')}</div>
     <div class="note"><span class="swatch taken"></span>灰色＝ほかの組に入っている人（選ぶとこの組に移ります）　<span class="swatch"></span>白＝まだ組に入っていない人</div>
@@ -997,7 +1002,7 @@ function evCard(ev){const inG=new Set(Object.values(ev.groups).flatMap(G=>G.memb
     <div class="note">IDは参加する時に入れる数字です。URLはアプリの入口です（初めての人はホーム画面に追加してから、IDで参加）。</div>
     <div class="note">共有できるのは ${fmtD(ev.date)} 0時から48時間です。参加者 ${ev.players.length}人。</div>
     <div class="label">組み合わせ</div>
-    ${gs.length?gs.map(g=>{const G=ev.groups[g]; return orgPick&&orgPick.code===ev.code&&orgPick.gid===g?pickBox(ev,g):`<div class="grow"><div class="row" style="justify-content:space-between"><b class="gno">${g}組</b><button class="chip" data-gedit="${ev.code}|${g}">人を変える</button></div><div class="gmem">${G.members.map(x=>`<span>${esc(pName(ev,x))}</span>`).join('')}</div></div>`;}).join(''):'<div class="note">まだ組は決まっていません。</div>'}
+    ${gs.length?gs.map(g=>{const G=ev.groups[g]; return orgPick&&orgPick.code===ev.code&&orgPick.gid===g?pickBox(ev,g):`<div class="grow" data-anc="g${ev.code}-${g}"><div class="row" style="justify-content:space-between"><b class="gno">${g}組</b><button class="chip" data-gedit="${ev.code}|${g}">人を変える</button></div><div class="gmem">${G.members.map(x=>`<span>${esc(pName(ev,x))}</span>`).join('')}</div></div>`;}).join(''):'<div class="note">まだ組は決まっていません。</div>'}
     ${orgPick&&orgPick.code===ev.code&&!ev.groups[orgPick.gid]?pickBox(ev,orgPick.gid):`<button class="btn ${gs.length?'ghost':'ordbtn'}" data-gnew="${ev.code}">${gs.length?'次の組を決める':'1組目を決める'}</button>`}
     ${rest.length?`<div class="note">まだ組に入っていない人：${rest.map(p=>esc(p.name)).join('・')}</div>`:''}
     ${orgEdit===ev.code?evEdit(ev):`<button class="btn ghost" data-oedit="${ev.code}">内容を直す（Hole Par・参加者）</button>`}
@@ -1134,7 +1139,14 @@ function bindShared(){const $=id=>document.getElementById(id);
     if(sel.includes(p)) orgPick.sel=sel.filter(x=>x!==p); else if(sel.length<4) sel.push(p); else toast='1つの組は4人までです。'; render();});
   if($('gCancel')) $('gCancel').onclick=()=>{orgPick=null; render();};
   if($('gSave')) $('gSave').onclick=()=>{const {code,gid,sel}=orgPick; orgPick=null;
-    B.setGroup(code,gid,sel).then(()=>{toast=sel.length?`${gid}組を決めました。`:`${gid}組をなくしました。`; render();}).catch(()=>{toast='組を決められませんでした。このIDを発行した人のスマホから、電波の良い所でお試しください。'; render();}); render();};
+    // 手元の表示を先に更新し、まだ組に入っていない人がいれば、そのまま次の組を選ぶ画面を開く
+    const ev=Shared.get(code);
+    if(ev){const g={}; for(const k of Object.keys(ev.groups)){if(k!==gid){const m=ev.groups[k].members.filter(x=>!sel.includes(x)); if(m.length) g[k]={by:ev.groups[k].by,members:m};}}
+      if(sel.length) g[gid]={by:'org',members:sel.slice()}; ev.groups=g;
+      const inG=new Set(Object.values(g).flatMap(G=>G.members));
+      if(sel.length&&ev.players.some(p=>!inG.has(p.id))) orgPick={code,gid:String(Math.max(0,...Object.keys(g).map(Number))+1),sel:[]};}
+    toast=sel.length?`${gid}組を決めました。`:`${gid}組をなくしました。`;
+    B.setGroup(code,gid,sel).then(()=>{render();}).catch(()=>{toast='組を決められませんでした。このIDを発行した人のスマホから、電波の良い所でお試しください。'; render();}); render();};
   if($('ormNo')) $('ormNo').onclick=()=>{ormAsk=null;render();};
   document.querySelectorAll('[data-evdel]').forEach(b=>b.onclick=()=>{evDelAsk=b.dataset.evdel; render();});
   if($('evDelNo')) $('evDelNo').onclick=()=>{evDelAsk=null; render();};
