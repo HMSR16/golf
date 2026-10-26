@@ -1044,7 +1044,7 @@ function vJoin(){
   if(J.step==='code') return `<section class="card"><div class="label">IDで参加</div>
     <div class="coderow"><input type="text" id="joinCode" inputmode="numeric" maxlength="4" placeholder="イベントID" value="${esc(J.code)}"><button class="btn" id="joinGo"${busy?' disabled':''}>${busy?'確認中…':'参加'}</button></div>
     ${J.msg?`<div class="toast warn">${esc(J.msg)}</div>`:''}${J.early&&IS_DEMO?`<button class="btn ghost" id="joinForce">試し用：今すぐ参加する</button>`:''}
-    <div class="or">または</div><button class="btn ghost" id="soloGo">単体で始める（共有しない）</button></section>`;
+    <div class="or">または</div><button class="btn ghost" id="soloGo">IDなしで始める</button><div class="note" style="text-align:center">（スコアの共有はできません）</div></section>`;
   const ev=Shared.get(J.code);
   if(!ev){if(Shared.status(J.code)==='loading') return loadingCard(); J={step:'code',code:'',msg:'IDが見つかりません。期限が切れた可能性があります。',early:false,me:null,picks:[]}; return vJoin();}
   const gl=p=>{const g=groupOf(ev,p.id); return g?`<small>${g}組（${esc(byName(ev,ev.groups[g]))}が選択）</small>`:'';};
@@ -1244,7 +1244,7 @@ function vSetupAll(){
   if(L.role==='organizer') return roleCard()+vOrg();
   if(L.role==='gallery') return roleCard()+vGallery();
   if(!L.link&&L.pmode!=='solo') return roleCard()+vJoin();
-  return roleCard()+(L.link?(curEv?vLinkedCard():loadingCard('共有データを読み込み中…')):`<section class="card"><button class="btn ghost" id="toJoin">IDで参加する</button></section>`)+vSetup()+(L.link&&curEv?vLeaveCard():'');}
+  return roleCard()+(L.link?(curEv?vLinkedCard():loadingCard('共有データを読み込み中…')):`<section class="card"><button class="btn ghost" id="toJoin">IDで参加</button></section>`)+vSetup()+(L.link&&curEv?vLeaveCard():'');}
 function vHist(){if(!REG) return regCard(); return vHistInner()+(histOpen?'':regCard());}
 
 
@@ -1258,7 +1258,7 @@ function vHelp(){
     <p>ゴルフのスコアを入れると、ラスベガスやマッチプレーの点数、コンペの順位を自動で出します。設定画面の一番上で、役割を選びます。</p>
     <dl>
       <dt>主催者</dt><dd>コンペを登録してイベントIDを発行。パー・参加者・組み合わせを決める（メールアドレスの登録が必要）。</dd>
-      <dt>プレーヤー</dt><dd>イベントIDを入れて自分の名前を選び、スコアを入れる。IDを使わず「単体で始める」こともできる。</dd>
+      <dt>プレーヤー</dt><dd>イベントIDを入れて自分の名前を選び、スコアを入れる。「IDなしで始める」こともできる（スコアの共有はできない）。</dd>
       <dt>ギャラリー</dt><dd>イベントIDを入れると、順位表とスコアカードを見られる。</dd>
     </dl>`,true)}
   ${sec('2. ホーム画面に追加する',`
@@ -1299,7 +1299,7 @@ function vHelp(){
     <dl class="faq">
       <dt>途中でアプリを閉じてしまった</dt><dd>IDで参加中なら、もう一度IDを入れて自分の名前を選べば続きから入力できる。</dd>
       <dt>組が違う</dt><dd>組の変更は主催者が行う。主催者に伝える。</dd>
-      <dt>2人・3人の組</dt><dd>ラスベガスは「しない」にする。単体で使う時は、使わない欄の名前を消す。</dd>
+      <dt>2人・3人の組</dt><dd>ラスベガスは「しない」にする。IDなしで使う時は、使わない欄の名前を消す。</dd>
       <dt>共有データはいつ消える？</dt><dd>開催日の0時から48時間。残したい人は、その前に「保存して終了」。</dd>
       <dt>同じ組で2人が入力したら？</dt><dd>後から入れた数字が使われる。</dd>
     </dl>`)}
