@@ -1045,7 +1045,7 @@ function vJoin(){
   if(J.step==='code') return `<section class="card">
     <div class="coderow"><input type="text" id="joinCode" inputmode="numeric" maxlength="4" placeholder="IDで参加（イベントID）" value="${esc(J.code)}"><button class="btn" id="joinGo"${busy?' disabled':''}>${busy?'確認中…':'参加'}</button></div>
     ${J.msg?`<div class="toast warn">${esc(J.msg)}</div>`:''}${J.early&&IS_DEMO?`<button class="btn ghost" id="joinForce">試し用：今すぐ参加する</button>`:''}
-    <div class="or">または</div><button class="btn ghost" id="soloGo">IDなしで始める（スコアの共有はできません）</button></section>`;
+    <div class="or">または</div><button class="btn ghost" id="soloGo">IDなしで始める<br><small style="font-weight:600">（スコアの共有はできません）</small></button></section>`;
   const ev=Shared.get(J.code);
   if(!ev){if(Shared.status(J.code)==='loading') return loadingCard(); J={step:'code',code:'',msg:'IDが見つかりません。期限が切れた可能性があります。',early:false,me:null,picks:[]}; return vJoin();}
   const gl=p=>{const g=groupOf(ev,p.id); return g?`<small>${g}組（${esc(byName(ev,ev.groups[g]))}が選択）</small>`:'';};
