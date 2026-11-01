@@ -471,7 +471,7 @@ function mpHc(i,k,m){const h=mhOf(m.b); if(!((h.who==='me'&&k===m.a)||(h.who==='
   return Number(h.v[R.holes[i].par])||0;}
 function mpNet(i,k,m){const g=mpSc(i,k),par=R.holes[i].par,h=mpHc(i,k,m); if(g==null) return null;
   return g>par?Math.max(par,g-h):g;} // ハンデを引いてもパーより良くはしない
-// up>0 なら自分がリード。残りホール数より差が大きくなったら決着、それ以降は数えない
+// up>0 なら自分がリード。勝ちが決まっても18Hまで数える
 function mpRun(m,upto){upto=upto==null?HOLES-1:upto; let up=0,dec=null,last=-1; const w=[0,0,0], cells=[];
   for(let i=0;i<HOLES;i++){
     if(i>upto){cells.push(null);continue;}
@@ -480,14 +480,14 @@ function mpRun(m,upto){upto=upto==null?HOLES-1:upto; let up=0,dec=null,last=-1; 
     const r=na<nb?1:nb<na?-1:0, after=!!dec;
     if(!after){up+=r; last=i; w[r===1?0:r===-1?1:2]++;}
     cells.push({r,up,after});
-    const rem=HOLES-1-i; if(!dec&&Math.abs(up)>rem) dec={i,rem};}
+  } // 勝ちが決まっても最後（18H）まで数える
   return {cells,up,dec,last,w};}
+// 何ホール勝ち越し／負け越しかを、最後まで表示する
 function mpStatus(x){const n=Math.abs(x.up), W=x.up>0;
   if(x.last<0) return 'まだスコアがありません';
-  if(x.dec) return x.dec.rem>0?`${W?'勝ち':'負け'}（${n}&${x.dec.rem}）`:`${W?'勝ち':'負け'}（${n}${W?'アップ':'ダウン'}）`;
-  const rem=HOLES-1-x.last;
-  if(x.up===0) return rem===0?'引き分け':'オールスクエア（同点）';
-  return `${n}${W?'アップ':'ダウン'}${n===rem?'（ドーミー）':''}`;}
+  const rem=HOLES-1-x.last, tail=rem>0?`（残り${rem}H）`:'';
+  if(x.up===0) return (rem===0?'引き分け':'同点')+tail;
+  return `${n}ホール${W?'勝ち越し':'負け越し'}${tail}`;}
 const mpCol=x=>x.up>0?'var(--teamA)':x.up<0?'var(--teamB)':'var(--fg)';
 const mpTag=k=>(R.setup.me===k?'<span class="metag">自分</span>':'')+(isExt(k)?'<span class="ext">場外</span>':'');
 const mpVs=m=>`<b class="na">${esc(MN(m.a))}</b>${mpTag(m.a)} <span class="vs">vs</span> <b class="nb">${esc(MN(m.b))}</b>${mpTag(m.b)}`;
@@ -496,7 +496,7 @@ function mpSummary(clickable){const ms=mpMatches(); if(!ms.length) return '';
     return `<div class="mblock"><div class="mhead"><span>${mpVs(m)}</span><span class="note">自分 ${x.w[0]}勝・${esc(MN(m.b))} ${x.w[1]}勝・分け${x.w[2]}</span></div>
       <div class="mbig" style="color:${mpCol(x)}">${esc(mpStatus(x))}</div>
       <div class="mgrid">${x.cells.map((c,i)=>`<div class="mc ${!c?'':c.after?'off':c.r>0?'a':c.r<0?'b':''} ${clickable&&i===L.cur?'cur':''}" ${clickable?`data-go="${i}"`:''}>${i+1}<b>${!c?'·':c.after?'–':c.up===0?'AS':Math.abs(c.up)}</b></div>`).join('')}</div></div>`;}).join('')}</div>
-    <div class="note">マスの色＝そのホールに勝った人（<span class="na">青</span>は自分、<span class="nb">赤</span>は相手、白は引き分け）。数字＝その時点で何ホールリードしているか。AS＝同点。薄いマスは決着後。</div>`;}
+    <div class="note">マスの色＝そのホールに勝った人（<span class="na">青</span>は自分、<span class="nb">赤</span>は相手、白は引き分け）。数字＝その時点で何ホールリードしているか。AS＝同点。</div>`;}
 function mpText(){return mpMatches().map(m=>`マッチ 自分 vs ${MN(m.b)}：${mpStatus(mpRun(m))}`);}
 
 /* ---------- writing: local or shared ---------- */
@@ -722,7 +722,7 @@ function mpSetupCard(s){const mp=s.mp;
     ${mp.ext.length?'<div class="note">場外の人は追加すると自動で対戦になります。パーは「スコア」画面で入れたものを使います。</div>':''}
     ${ms.length?`<div class="label">ハンデ（対戦ごと・パー3・4・5ごとに引く打数）</div><div class="mlist">${hc}</div>
       ${ms.some(m=>mhOf(m.b).who!=='none')?`      <div class="note">例：「自分がもらう」でパー4に1打、自分のスコア5 → ネット4で相手と比べます。ほかの対戦には影響しません。ハンデを引いてもパーより良くはなりません。</div>`:''}
-      <div class="terms"><b>アップ／ダウン</b><span>何ホール勝ち越し／負け越しているか</span><b>オールスクエア</b><span>同点</span><b>ドーミー</b><span>差と残りホール数が同じ</span><b>3&amp;2</b><span>残り2ホールで3アップになり勝ちが決まった</span></div>`:''}
+      <div class="note">勝ちが決まっても18Hまで数えて、最後に何ホール勝ち越し／負け越しかを表示します。</div>`:''}
   </section>`;}
 function mpHoleCard(i){const ms=mpMatches().filter(m=>!isExt(m.b)); if(!ms.length) return '';
   let anyH=false;
@@ -1284,13 +1284,9 @@ function vHelp(){
     <p class="ex"><b>例</b>　Aチーム 4と5、Bチーム 5と6 → 前は4対5でA+1、後も5対6でA+1 → <b>Aが+2</b></p>
     <p class="ex"><b>例</b>　パー4で、Aチーム 3と5、Bチーム 4と6 → Aのバーディーで、Bは前6・後4に入れ替え。前は3対6でA+3、後は5対4でAが負けたので0、バーディー賞+1 → <b>Aが+4</b></p>`)}
   ${sec('5. マッチプレーの見方',`
-    <p>自分と相手の1対1で、ホールごとに勝ち負けを数えます。</p>
-    <dl>
-      <dt>アップ／ダウン</dt><dd>何ホール勝ち越し／負け越しているか</dd>
-      <dt>オールスクエア</dt><dd>同点</dd>
-      <dt>ドーミー</dt><dd>差と残りホール数が同じ（次に負けなければ勝ち）</dd>
-      <dt>3&amp;2</dt><dd>残り2ホールで3アップになり、勝ちが決まった</dd>
-    </dl>`)}
+    <p>自分と相手の1対1で、ホールごとに勝ち負けを数えます。勝ちが決まっても18Hまで数えます。</p>
+    <p class="ex"><b>例</b>　自分が10ホール勝ち、相手が6ホール勝ち、2ホール引き分け → <b>4ホール勝ち越し</b></p>
+    <p>途中は「2ホール勝ち越し（残り5H）」のように出ます。マスの数字は、その時点で何ホールリードしているか（同点はAS）。</p>`)}
   ${sec('6. 登録と履歴',`
     <p>履歴を残すのと、主催者としてIDを発行するには、メールアドレスの登録が必要です（「履歴」タブから）。</p>
     <p>登録は、<b>ホーム画面のアイコンから開いたアプリ</b>で行ってください。iPhoneでは、確認メールのリンクを<b>押さずに長押しでコピー</b>して、アプリに貼り付けます。</p>
