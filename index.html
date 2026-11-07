@@ -116,9 +116,9 @@ input[type=text],input[type=number]{font:inherit;color:var(--fg);background:var(
 .sumhead small{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-top:2px}
 .mk{font-family:var(--font-body);font-size:20px;font-weight:400;line-height:1}
 .mkw{position:relative;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px}
-.mkw svg{position:absolute;inset:0;width:100%;height:100%;fill:none;stroke:var(--accent);stroke-width:1.6}
-.mkw b{position:relative;font-family:var(--font-num);font-size:15px;font-weight:700;line-height:1}
-.mkw.tri b{font-size:12.5px;margin-top:8px}
+.mkw svg{position:absolute;inset:-1px;width:calc(100% + 2px);height:calc(100% + 2px);fill:none;stroke:var(--accent);stroke-width:1.1;opacity:.45}
+.mkw b{position:relative;font-family:var(--font-num);font-size:18px;font-weight:700;line-height:1}
+.mkw.tri b{margin-top:3px}
 .mkw.over b{color:var(--danger)}
 .mk.sq{font-size:27px}
 .hsel{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:4px}
@@ -449,7 +449,11 @@ function halfTotals(a,b){const tot=[0,0,0,0],gro=[0,0,0,0];let putt=0;
     for(let k=0;k<4;k++){const g=R.holes[i].s[k]; if(g!=null) gro[k]+=g;} if(R.holes[i].putt!=null) putt+=R.holes[i].putt;}
   return {tot,gro,putt};}
 // スコアカード（実際のスコア・ハンデなし）。—パー △ボギー □Dボギー ○バーディー ◎イーグル以下 +3以上は数字
-// 打数の数字に、記号を重ねて表示する
+// 順位表から開くスコアカードは、記号だけで表示する（—パー △ボギー □Dボギー ○バーディー ◎イーグル以下 +3以上は数字）
+function scMarkOnly(g,par){if(g==null) return '';const d=g-par;
+  if(d<=-2) return '<span class="mk">◎</span>'; if(d===-1) return '<span class="mk">○</span>'; if(d===0) return '<span class="mk">—</span>';
+  if(d===1) return '<span class="mk">△</span>'; if(d===2) return '<span class="mk sq">□</span>'; return '+'+d;}
+// 同組のスコアカードは、打数の数字に記号を薄く重ねて表示する
 function scMark(g,par){if(g==null) return '';const d=g-par;
   const sh=d<=-2?'<circle cx="15" cy="15" r="13.5"/><circle cx="15" cy="15" r="10.5"/>':d===-1?'<circle cx="15" cy="15" r="13"/>':d===0?'<line x1="7" y1="26" x2="23" y2="26"/>'
     :d===1?'<polygon points="15,1.5 28.5,27.5 1.5,27.5"/>':d===2?'<rect x="2.5" y="2.5" width="25" height="25"/>':'';
@@ -965,12 +969,12 @@ function linkTo(ev,gid,pid){L.local={setup:defaultSetup(),holes:blankHoles()}; L
 const localHasScores=()=>L.local.holes.some(H=>H.s.some(v=>v!=null));
 
 /* ---------- 順位表とスコアカード ---------- */
-function cardFor(name,sc,pars,isMe,putts){let gross=0,parSum=0,n=0;
+function cardFor(name,sc,pars,isMe,putts,markOnly){const mkf=markOnly?scMarkOnly:scMark;let gross=0,parSum=0,n=0;
   sc.forEach((g,i)=>{if(g!=null){gross+=g;parSum+=pars[i];n++;}});
   const half=a=>{const idx=[...Array(9)].map((_,j)=>a+j), cnt=idx.filter(i=>sc[i]!=null).length, sum=idx.reduce((t,i)=>t+(sc[i]??0),0);
     return `<div class="scg">${idx.map(i=>`<div class="sh">${i+1}</div>`).join('')}<div class="sh">${a?'IN':'OUT'}</div>
       ${idx.map(i=>`<div class="sp">${pars[i]}</div>`).join('')}<div class="sp">${idx.reduce((t,i)=>t+pars[i],0)}</div>
-      ${idx.map(i=>`<div class="sv">${scMark(sc[i]??null,pars[i])}</div>`).join('')}<div class="sv tot">${cnt?sum:''}</div>${putts?(()=>{const pc=idx.filter(i=>putts[i]!=null).length, ps=idx.reduce((t,i)=>t+(putts[i]??0),0);
+      ${idx.map(i=>`<div class="sv">${mkf(sc[i]??null,pars[i])}</div>`).join('')}<div class="sv tot">${cnt?sum:''}</div>${putts?(()=>{const pc=idx.filter(i=>putts[i]!=null).length, ps=idx.reduce((t,i)=>t+(putts[i]??0),0);
         return idx.map(i=>`<div class="spt">${putts[i]??''}</div>`).join('')+`<div class="spt tot">${pc?ps:''}</div>`;})():''}</div>`;};
   const d=gross-parSum;
   return `<div class="scard${isMe?' me':''}"><div class="schead"><b>${esc(name)}</b>${isMe?'<span class="mytag">自分</span>':''}
@@ -981,7 +985,7 @@ function rankRows(ev){return ev.players.map(p=>{const sc=(ev.scores[p.id]||Array
 function rankHtml(rows,pars,meId){if(!rows.length) return '<div class="note">まだスコアが入っていません。</div>';
   let prev=null,rk=0;
   return `<div class="rank"><div class="rhead"><span>順位</span><span>プレーヤー</span><span>スコア</span><span>ホール</span></div>${rows.map((r,j)=>{if(prev===null||r.d!==prev) rk=j+1; prev=r.d; const open=rankOpen===r.id;
-    return `<button class="rrow${open?' open':''}${r.id===meId?' mine':''}" data-rk="${esc(r.id)}"><span class="rn">${rk}</span><span class="rname">${esc(r.name)}</span><span class="rsc">${r.d>0?'+'+r.d:r.d===0?'±0':r.d}<small>(${r.g})</small></span><span class="rh">${r.n}</span></button>${open?`<div class="ropen">${cardFor(r.name,r.sc,pars,r.id===meId)}</div>`:''}`;}).join('')}</div>
+    return `<button class="rrow${open?' open':''}${r.id===meId?' mine':''}" data-rk="${esc(r.id)}"><span class="rn">${rk}</span><span class="rname">${esc(r.name)}</span><span class="rsc">${r.d>0?'+'+r.d:r.d===0?'±0':r.d}<small>(${r.g})</small></span><span class="rh">${r.n}</span></button>${open?`<div class="ropen">${cardFor(r.name,r.sc,pars,r.id===meId,null,true)}</div>`:''}`;}).join('')}</div>
     <div class="note">名前を押すとスコアカードが出ます。</div>`;}
 
 /* ---------- 役割の切り替え ---------- */
@@ -1281,7 +1285,7 @@ function vHelp(){
     </dl>`)}
   ${sec('3. スコアの入れ方と集計',`
     <p><b>スコア</b>：◀▶でホールを移動し、＋−で打数を入れる。最初に押すとパーの数になる。名前の横に「パー」「ボギー」などが出るので、パーの入れ間違いに気づける。</p>
-    <p><b>集計</b>：スコアカードは打数の数字に記号を重ねて表示。下線＝パー　△ボギー　□ダブルボギー　○バーディー　◎イーグル。記号なし（赤い数字）はトリプルボギー以上。名前の横の「+25（97）」は、パーとの差（合計スコア）。</p>
+    <p><b>集計</b>：同組のスコアカードは打数の数字に記号を薄く重ねて表示（順位表から開くスコアカードは記号だけ）。下線＝パー　△ボギー　□ダブルボギー　○バーディー　◎イーグル。記号なし（赤い数字）はトリプルボギー以上。名前の横の「+25（97）」は、パーとの差（合計スコア）。</p>
     <p><b>パット数</b>：設定で「記録する」にすると、自分の分だけ入れられます。スコアカードの記号の下に出ます。</p>`)}
   ${sec('4. ラスベガスのルール',`
     <p>2人ずつのチームで対戦。ハンデを引いたスコアの良い方が「前」、悪い方が「後」。</p>
