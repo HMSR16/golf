@@ -115,6 +115,11 @@ input[type=text],input[type=number]{font:inherit;color:var(--fg);background:var(
 .sumhead .hside{font-size:14px;font-weight:700;color:var(--fg);margin-left:10px}
 .sumhead small{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-top:2px}
 .mk{font-family:var(--font-body);font-size:20px;font-weight:400;line-height:1}
+.mkw{position:relative;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px}
+.mkw svg{position:absolute;inset:0;width:100%;height:100%;fill:none;stroke:var(--accent);stroke-width:1.6}
+.mkw b{position:relative;font-family:var(--font-num);font-size:15px;font-weight:700;line-height:1}
+.mkw.tri b{font-size:12.5px;margin-top:8px}
+.mkw.over b{color:var(--danger)}
 .mk.sq{font-size:27px}
 .hsel{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:4px}
 .hs{font:inherit;font-family:var(--font-num);font-size:18px;font-weight:700;line-height:1.05;padding:5px 0;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer;min-height:44px}
@@ -390,6 +395,8 @@ function honorOrder(i){const so=R.setup.order; let o=(Array.isArray(so)&&so.leng
   for(let j=0;j<i;j++){const s=R.holes[j].s; if(act.some(k=>s[k]==null)) continue;
     o=o.slice().sort((a,b)=>(act.includes(a)?0:1)-(act.includes(b)?0:1)||(act.includes(a)?s[a]-s[b]:0));}
   return o;}
+// 1番ホールのオナー順が必要なのは、ラスベガスのローテーションの時だけ
+function ordNeed(){return !!(R.setup.lvOn&&R.setup.mode==='rotate');}
 function ordActive(){return R.setup.lvOn?[0,1,2,3]:[0,1,2,3].filter(slotOn);}
 function teams(i){
   const m=R.setup.mode;
@@ -442,13 +449,15 @@ function halfTotals(a,b){const tot=[0,0,0,0],gro=[0,0,0,0];let putt=0;
     for(let k=0;k<4;k++){const g=R.holes[i].s[k]; if(g!=null) gro[k]+=g;} if(R.holes[i].putt!=null) putt+=R.holes[i].putt;}
   return {tot,gro,putt};}
 // スコアカード（実際のスコア・ハンデなし）。—パー △ボギー □Dボギー ○バーディー ◎イーグル以下 +3以上は数字
+// 打数の数字に、記号を重ねて表示する
 function scMark(g,par){if(g==null) return '';const d=g-par;
-  if(d<=-2) return '<span class="mk">◎</span>'; if(d===-1) return '<span class="mk">○</span>'; if(d===0) return '<span class="mk">—</span>';
-  if(d===1) return '<span class="mk">△</span>'; if(d===2) return '<span class="mk sq">□</span>'; return '+'+d;}
+  const sh=d<=-2?'<circle cx="15" cy="15" r="13.5"/><circle cx="15" cy="15" r="10.5"/>':d===-1?'<circle cx="15" cy="15" r="13"/>':d===0?'<line x1="7" y1="26" x2="23" y2="26"/>'
+    :d===1?'<polygon points="15,1.5 28.5,27.5 1.5,27.5"/>':d===2?'<rect x="2.5" y="2.5" width="25" height="25"/>':'';
+  return `<span class="mkw${d===1?' tri':''}${d>=3?' over':''}">${sh?`<svg viewBox="0 0 30 30" aria-hidden="true">${sh}</svg>`:''}<b>${g}</b></span>`;}
 const PT=()=>!!(R.setup.puttOn&&R.setup.me!=null); // 自分のパット数を記録する時だけ
 function scoreCards(){const pars=R.holes.map(H=>H.par);
   return [0,1,2,3].filter(slotOn).map(k=>cardFor(N(k),R.holes.map(H=>H.s[k]),pars,R.setup.me===k,PT()&&R.setup.me===k?R.holes.map(H=>H.putt):null)).join('')
-    +`<div class="note">実際のスコア（ハンデなし）。—パー、△ボギー、□ダブルボギー、○バーディー、◎イーグル。+3はパーより3打多い。${PT()?'自分の欄の下の段はパット数。':''}</div>`;}
+    +`<div class="note">数字は実際の打数（ハンデなし）。下線＝パー、△ボギー、□ダブルボギー、○バーディー、◎イーグル。記号なしはトリプルボギー以上。${PT()?'自分の欄の下の段はパット数。':''}</div>`;}
 function withR(r,f){const o=R;R=r;try{return f();}finally{R=o;}}
 const N=k=>R.setup.names[k]||('P'+(k+1));
 // 使っている欄か（2人・3人の組では、名前のない欄・空きの欄は表示しない）
@@ -660,10 +669,10 @@ function vSetup(){
     <input type="text" id="course" value="${esc(s.course)}" placeholder="例：○○カントリークラブ"${L.link?' readonly':''}>
     <div class="label">プレーヤーの名前</div>
     <div class="names">${[0,1,2,3].map(k=>`<label>${k+1}人目<input type="text" id="name${k}" value="${esc(s.names[k])}"${L.link?' readonly':''}></label>`).join('')}</div>
-    ${(()=>{const act=ordActive(), cur=(ordPick?ordPick:s.order).filter(k=>act.includes(k)); return `    <div class="label">1番ホールのオナー順</div>
-    <div class="ordnow">${cur.map((k,j)=>`<span><b>${j+1}</b>${esc(N(k))}</span>`).join('')}${ordPick?[...Array(Math.max(0,act.length-cur.length))].map((_,j)=>`<span class="empty"><b>${cur.length+j+1}</b>？</span>`).join(''):''}</div>
+    ${(()=>{const act=ordActive(), cur=(ordPick?ordPick:s.order).filter(k=>act.includes(k)), need=ordNeed(); return `    <div class="label">1番ホールのオナー順</div>
+    ${!ordPick&&!s.orderSet?`<div class="note">${need?'ラスベガスのローテーションでは、1番ホールのオナー順を決めてください。':'決めなくても始められます。2番ホールからは、前のホールのスコア順に表示します。'}</div>`:`<div class="ordnow">${cur.map((k,j)=>`<span><b>${j+1}</b>${esc(N(k))}</span>`).join('')}${ordPick?[...Array(Math.max(0,act.length-cur.length))].map((_,j)=>`<span class="empty"><b>${cur.length+j+1}</b>？</span>`).join(''):''}</div>`}
     ${ordPick?`<div class="chips" id="ordSel">${act.filter(k=>!ordPick.includes(k)).map(k=>`<button class="chip" data-ord="${k}">${esc(N(k))}</button>`).join('')}<button class="chip" id="ordCancel">やめる</button></div><div class="note">打つ順番に名前をタップしてください。</div>`
-      :`<button class="btn ${s.orderSet?'ghost':'ordbtn'}" id="ordStart">${s.orderSet?'オナー順を決め直す':'オナー順を決める'}</button>`}
+      :`<button class="btn ${s.orderSet||!need?'ghost':'ordbtn'}" id="ordStart">${s.orderSet?'オナー順を決め直す':'オナー順を決める'}</button>`}
 `;})()}
     <div class="label">自分はどの人？</div>
     ${L.link?`<div class="note">自分：${esc(N(0))}（IDで参加中）</div>`:''}<div class="chips" id="meSel"${L.link?' hidden':''}>${[0,1,2,3].map(k=>`<button class="chip" data-me="${k}" aria-pressed="${s.me===k}">${esc(N(k))}</button>`).join('')}</div>
@@ -737,7 +746,7 @@ function vHole(){
   const LV=!!R.setup.lvOn;
   const team=k=>!LV||!t?'none':t.A.includes(k)?'A':'B';
   const pr=i>0?compute(i-1):null, prevTie=pr&&pr.ptsA===0;
-  const ordOf=LV?(t&&t.order):honorOrder(i).filter(slotOn);
+  const ordOf=LV&&R.setup.mode==='rotate'?(t&&t.order):honorOrder(i).filter(k=>LV||slotOn(k));
   const orderLine=ordOf&&ordOf.length?`<div class="pairline order"><span class="nw">打順：${esc(N(ordOf[0]))}</span>${ordOf.slice(1).map(k=>` <span class="nw">→ ${esc(N(k))}</span>`).join('')}</div>`:'';
   const pairText=t?`<b style="color:var(--teamA)">${t.A.map(k=>`<span class="nw">${esc(N(k))}</span>`).join('・')}</b> vs <b style="color:var(--teamB)">${t.B.map(k=>`<span class="nw">${esc(N(k))}</span>`).join('・')}</b>`:'ペア未決定';
   const kan=LV&&R.setup.mode==='kankan'?`<section class="card"><div class="label">カンカン：${esc(N(0))}さんのパートナー</div><div class="chips" id="kanP">${[1,2,3].map(k=>`<button class="chip" data-p="${k}" aria-pressed="${H.partner===k}">${esc(N(k))}</button>`).join('')}</div></section>`:'';
@@ -773,8 +782,8 @@ function vHole(){
       <div class="num">${i+1}<small>H</small></div>
       <button class="navbtn" id="next" ${i===HOLES-1?'disabled':''} aria-label="次のホール">▶</button></div>
     ${L.link?`<div class="row" style="justify-content:center"><span class="label">PAR</span><b class="parfix">${H.par}</b><span class="note">（主催者が登録）</span></div>`:`<div class="row" style="justify-content:center"><span class="label">PAR</span><div class="chips" id="par">${[3,4,5].map(p=>`<button class="chip" data-par="${p}" aria-pressed="${H.par===p}">${p}</button>`).join('')}</div></div>`}
-    ${!LV?(i===0&&!R.setup.orderSet?`<button class="ordwarn" id="ordGo">設定からオナー順を登録してください<small>タップで設定を開きます</small></button>`:orderLine):i===0&&!R.setup.orderSet?`<button class="ordwarn" id="ordGo">設定からオナー順を登録してください<small>タップで設定を開きます</small></button>`
-      :`${orderLine}<div class="pairline">${pairText}</div>`}
+    ${i===0&&!R.setup.orderSet&&ordNeed()?`<button class="ordwarn" id="ordGo">設定からオナー順を登録してください<small>タップで設定を開きます</small></button>`
+      :`${i===0&&!R.setup.orderSet?'':orderLine}${LV?`<div class="pairline">${pairText}</div>`:''}`}
   </section>
   <section class="card" id="players">${players}</section>
   ${kan}
@@ -1272,7 +1281,7 @@ function vHelp(){
     </dl>`)}
   ${sec('3. スコアの入れ方と集計',`
     <p><b>スコア</b>：◀▶でホールを移動し、＋−で打数を入れる。最初に押すとパーの数になる。名前の横に「パー」「ボギー」などが出るので、パーの入れ間違いに気づける。</p>
-    <p><b>集計</b>：スコアカードの記号は　—パー　△ボギー　□ダブルボギー　○バーディー　◎イーグル。+3以上は数字。名前の横の「+25（97）」は、パーとの差（合計スコア）。</p>
+    <p><b>集計</b>：スコアカードは打数の数字に記号を重ねて表示。下線＝パー　△ボギー　□ダブルボギー　○バーディー　◎イーグル。記号なし（赤い数字）はトリプルボギー以上。名前の横の「+25（97）」は、パーとの差（合計スコア）。</p>
     <p><b>パット数</b>：設定で「記録する」にすると、自分の分だけ入れられます。スコアカードの記号の下に出ます。</p>`)}
   ${sec('4. ラスベガスのルール',`
     <p>2人ずつのチームで対戦。ハンデを引いたスコアの良い方が「前」、悪い方が「後」。</p>
