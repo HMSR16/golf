@@ -199,6 +199,8 @@ input[type=email]{font:inherit;font-size:17px;color:var(--fg);background:var(--b
 .secbtn span{font-size:14px;font-weight:500;opacity:.9}
 .btn.ordbtn{background:var(--danger);border-color:var(--danger);color:var(--card)}
 .ordnow{display:flex;flex-wrap:wrap;gap:6px 14px}
+.pdrow{display:flex;justify-content:space-between;align-items:flex-end;gap:10px}
+.pdrow .btn{font-size:13px;line-height:1.3;padding:8px 12px}
 .ordnow span{display:flex;align-items:center;gap:6px;font-weight:700}
 .ordnow b{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--accent);color:var(--card);font-family:var(--font-num);font-size:15px}
 .ordnow .empty{color:var(--muted)} .ordnow .empty b{background:var(--line);color:var(--muted)}
@@ -355,7 +357,7 @@ const today=()=>new Date().toLocaleDateString('sv-SE');
 const clone=o=>JSON.parse(JSON.stringify(o));
 function blankHole(){return {par:4,s:[null,null,null,null],h:[0,0,0,0],partner:null,np:null,carry:0,mult:1,putt:null};}
 function blankHoles(){return Array.from({length:HOLES},blankHole);}
-function defaultSetup(){return {me:null,date:'',course:'',names:['Aさん','Bさん','Cさん','Dさん'],order:[0,1,2,3],orderSet:false,lvSeen:false,mpSeen:false,lvOn:false,mpOn:false,puttOn:false,mode:'rotate',fixedPartner:1,
+function defaultSetup(){return {me:null,date:'',course:'',names:['Aさん','Bさん','Cさん','Dさん'],order:[0,1,2,3],orderSet:false,lvSeen:false,mpSeen:false,lvOn:false,mpOn:false,puttOn:false,dispOrder:[0,1,2,3],mode:'rotate',fixedPartner:1,
   hcp:['none','none','none','none'],hcpPar:[0,1,2,3].map(()=>({3:0,4:1,5:2})),split:false,
   hcp2:['none','none','none','none'],hcpPar2:[0,1,2,3].map(()=>({3:0,4:1,5:2})),
   mp:defaultMp()};}
@@ -397,6 +399,10 @@ function honorOrder(i){const so=R.setup.order; let o=(Array.isArray(so)&&so.leng
   return o;}
 // 1番ホールのオナー順が必要なのは、ラスベガスのローテーションの時だけ
 function ordNeed(){return !!(R.setup.lvOn&&R.setup.mode==='rotate');}
+// スコア画面の表示順（設定で並べ替えできる）
+function dispOrd(){const d=R.setup.dispOrder; return Array.isArray(d)&&d.length===4&&[0,1,2,3].every(k=>d.includes(k))?d:[0,1,2,3];}
+function dispActive(){return R.setup.lvOn?[0,1,2,3]:[0,1,2,3].filter(slotOn);}
+function isDefDisp(){return dispOrd().join()==='0,1,2,3';}
 function ordActive(){return R.setup.lvOn?[0,1,2,3]:[0,1,2,3].filter(slotOn);}
 function teams(i){
   const m=R.setup.mode;
@@ -680,9 +686,15 @@ function vSetup(){
 `;})()}
     <div class="label">自分はどの人？</div>
     ${L.link?`<div class="note">自分：${esc(N(0))}（IDで参加中）</div>`:''}<div class="chips" id="meSel"${L.link?' hidden':''}>${[0,1,2,3].map(k=>`<button class="chip" data-me="${k}" aria-pressed="${s.me===k}">${esc(N(k))}</button>`).join('')}</div>
-    <div class="label">パット数を記録</div>
-    <div class="chips" id="puttSel"><button class="chip" data-pt="1" aria-pressed="${!!s.puttOn}">する</button><button class="chip" data-pt="0" aria-pressed="${!s.puttOn}">しない</button></div>
+    <div class="pdrow"><div><div class="label">パット数を記録</div>
+    <div class="chips" id="puttSel"><button class="chip" data-pt="1" aria-pressed="${!!s.puttOn}">する</button><button class="chip" data-pt="0" aria-pressed="${!s.puttOn}">しない</button></div></div>
+    <button class="btn ghost" id="dispStart"${dispPick?' disabled':''}>スコアの<br>表示順</button></div>
     <div class="note">${s.puttOn&&s.me==null?'上で自分を選ぶと記録できます。':'自分のパット数のみ記録できます。ポイントの計算には影響しません。'}</div>
+    ${(()=>{const act=dispActive(), cur=dispPick||dispOrd().filter(k=>act.includes(k));
+      if(!dispPick) return isDefDisp()?'':`<div class="note">スコア画面の並び：${cur.map(k=>esc(N(k))).join(' → ')}</div>`;
+      return `<div class="pickbox"><b>スコア画面に並べる順に、名前をタップしてください</b>
+        <div class="ordnow">${cur.map((k,j)=>`<span><b>${j+1}</b>${esc(N(k))}</span>`).join('')}${[...Array(Math.max(0,act.length-cur.length))].map((_,j)=>`<span class="empty"><b>${cur.length+j+1}</b>？</span>`).join('')}</div>
+        <div class="chips" id="dispSel">${act.filter(k=>!dispPick.includes(k)).map(k=>`<button class="chip" data-disp="${k}">${esc(N(k))}</button>`).join('')}<button class="chip" id="dispCancel">やめる</button><button class="chip" id="dispReset">元の順に戻す</button></div></div>`;})()}
   </section>
   <button class="btn ${s.lvSeen?'ghost':'ordbtn'} secbtn" id="lvToggle" aria-expanded="${lvOpen}">ラスベガス<span>${lvOpen?'閉じる ▲':(s.lvOn?'する':'しない')+'・設定 ▼'}</span></button>
   ${lvOpen?`${onOff('lv',s.lvOn)}${s.lvOn?`<section class="card">
@@ -754,7 +766,7 @@ function vHole(){
   const orderLine=ordOf&&ordOf.length?`<div class="pairline order"><span class="nw">打順：${esc(N(ordOf[0]))}</span>${ordOf.slice(1).map(k=>` <span class="nw">→ ${esc(N(k))}</span>`).join('')}</div>`:'';
   const pairText=t?`<b style="color:var(--teamA)">${t.A.map(k=>`<span class="nw">${esc(N(k))}</span>`).join('・')}</b> vs <b style="color:var(--teamB)">${t.B.map(k=>`<span class="nw">${esc(N(k))}</span>`).join('・')}</b>`:'ペア未決定';
   const kan=LV&&R.setup.mode==='kankan'?`<section class="card"><div class="label">カンカン：${esc(N(0))}さんのパートナー</div><div class="chips" id="kanP">${[1,2,3].map(k=>`<button class="chip" data-p="${k}" aria-pressed="${H.partner===k}">${esc(N(k))}</button>`).join('')}</div></section>`:'';
-  const players=[0,1,2,3].filter(k=>LV||slotOn(k)).map(k=>{const hc=LV?hcpOf(i,k):0;
+  const players=dispOrd().filter(k=>LV||slotOn(k)).map(k=>{const hc=LV?hcpOf(i,k):0;
     return `<div class="player ${team(k)}">
       <div class="pname"><span class="tag">${team(k)==='A'?'チームA':team(k)==='B'?'チームB':'　'}</span>
         <span>${esc(N(k))}${scoreBadge(H.s[k],H.par)}</span>
@@ -935,7 +947,7 @@ const shareUrl=code=>`https://hmsr16.github.io/golf/#${code}`;
 const APP_URL='https://hmsr16.github.io/golf/';
 const evTitle=ev=>ev.name||ev.course||'コンペ';
 
-let lvOpen=false, mpOpen=false, orgPick=null, curEv=null, J={step:'code',code:'',msg:'',early:false,me:null,picks:[]}, galMsg='', galEarly=false, orgMsg='', grmAsk=null, ormAsk=null, evDelAsk=null, orgEdit=null, prmAsk=null, rankOpen=null, regMsg='', regDel=false, busy=false;
+let dispPick=null, lvOpen=false, mpOpen=false, orgPick=null, curEv=null, J={step:'code',code:'',msg:'',early:false,me:null,picks:[]}, galMsg='', galEarly=false, orgMsg='', grmAsk=null, ormAsk=null, evDelAsk=null, orgEdit=null, prmAsk=null, rankOpen=null, regMsg='', regDel=false, busy=false;
 let REG=null, HIST=[], unsubH=null, regStep=null, regMail='', regLink='';
 
 // 登録の状態と履歴の読み込み
@@ -1286,7 +1298,8 @@ function vHelp(){
   ${sec('3. スコアの入れ方と集計',`
     <p><b>スコア</b>：◀▶でホールを移動し、＋−で打数を入れる。最初に押すとパーの数になる。名前の横に「パー」「ボギー」などが出るので、パーの入れ間違いに気づける。</p>
     <p><b>集計</b>：同組のスコアカードは打数の数字に記号を薄く重ねて表示（順位表から開くスコアカードは記号だけ）。下線＝パー　△ボギー　□ダブルボギー　○バーディー　◎イーグル。記号なし（赤い数字）はトリプルボギー以上。名前の横の「+25（97）」は、パーとの差（合計スコア）。</p>
-    <p><b>パット数</b>：設定で「記録する」にすると、自分の分だけ入れられます。スコアカードの記号の下に出ます。</p>`)}
+    <p><b>パット数</b>：設定で「記録する」にすると、自分の分だけ入れられます。スコアカードの記号の下に出ます。</p>
+    <p><b>表示順</b>：設定の「スコアの表示順」で、スコア画面に並ぶ人の順番を変えられます。</p>`)}
   ${sec('4. ラスベガスのルール',`
     <p>2人ずつのチームで対戦。ハンデを引いたスコアの良い方が「前」、悪い方が「後」。</p>
     <ul>
@@ -1370,6 +1383,12 @@ function bind(){
       arr[k][p]=Math.max(0,(Number(arr[k][p])||0)+(+b.dataset.d)); mutate(r=>r.setup[f]=clone(arr),{setup:{[f]:arr}});});
     if($('ordStart')) $('ordStart').onclick=()=>{ordPick=[];render();};
     if($('ordCancel')) $('ordCancel').onclick=()=>{ordPick=null;render();};
+    if($('dispStart')) $('dispStart').onclick=()=>{dispPick=[];render();};
+    if($('dispCancel')) $('dispCancel').onclick=()=>{dispPick=null;render();};
+    if($('dispReset')) $('dispReset').onclick=()=>{dispPick=null; mutate(r=>r.setup.dispOrder=[0,1,2,3],{setup:{dispOrder:[0,1,2,3]}});};
+    document.querySelectorAll('[data-disp]').forEach(b=>b.onclick=()=>{dispPick.push(+b.dataset.disp); const act=dispActive();
+      if(dispPick.length===act.length-1) dispPick.push(act.find(k=>!dispPick.includes(k)));
+      if(dispPick.length>=act.length){const o=dispPick.concat([0,1,2,3].filter(k=>!dispPick.includes(k))); dispPick=null; mutate(r=>r.setup.dispOrder=o,{setup:{dispOrder:o}});} else render();});
     document.querySelectorAll('[data-ord]').forEach(b=>b.onclick=()=>{ordPick.push(+b.dataset.ord); const act=ordActive();
       if(ordPick.length===act.length-1) ordPick.push(act.find(k=>!ordPick.includes(k)));
       if(ordPick.length>=act.length){ordPick=ordPick.concat([0,1,2,3].filter(k=>!ordPick.includes(k)));}
